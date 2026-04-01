@@ -54,7 +54,7 @@ interface GameState {
   setError: (error: string | null) => void;
   requestRematch: () => Promise<void>;
   setRematchState: (me: boolean, opponent: boolean) => void;
-  resetForRematch: (startWord: string, targetWord: string) => void;
+  resetForRematch: (startWord: string) => void;
   reset: () => void;
 }
 
@@ -199,7 +199,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       }
 
       return true;
-    } catch (err) {
+    } catch {
       // Rollback optimistic update on network error
       set({
         error: 'Network error. Please try again.',
@@ -269,9 +269,9 @@ export const useGameStore = create<GameState>((set, get) => ({
 
       if (data.rematchStarted) {
         // The room will be updated via realtime, but we can reset local state
-        get().resetForRematch(data.startWord, data.targetWord);
+        get().resetForRematch(data.startWord);
       }
-    } catch (err) {
+    } catch {
       set({ error: 'Failed to request rematch', wantsRematch: false });
       setTimeout(() => set({ error: null }), 2500);
     }
@@ -281,7 +281,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({ wantsRematch: me, opponentWantsRematch: opponent });
   },
 
-  resetForRematch: (startWord, targetWord) => {
+  resetForRematch: (startWord) => {
     const state = get();
     // Set rematchInProgress to true temporarily to ignore stale is_winner updates
     set({

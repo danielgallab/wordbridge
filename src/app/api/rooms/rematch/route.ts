@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
+import { RoomPlayer } from '@/types';
 
 // POST /api/rooms/rematch - Request a rematch
 export async function POST(request: NextRequest) {
@@ -34,7 +35,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to check players' }, { status: 500 });
     }
 
-    const allWantRematch = players.length === 2 && players.every(p => p.wants_rematch);
+    const allWantRematch = players.length === 2 && players.every((p: RoomPlayer) => p.wants_rematch);
 
     if (allWantRematch) {
       // Get a new random word pair

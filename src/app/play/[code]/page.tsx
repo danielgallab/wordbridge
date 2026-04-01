@@ -11,14 +11,14 @@ export default function PlayPage() {
   const router = useRouter();
   const code = params.code as string;
 
-  const { room, playerId, setRoom, initGame, setPlayer } = useGameStore();
-  const [loading, setLoading] = useState(true);
+  const { room, playerId, setRoom, initGame } = useGameStore();
+  const roomAlreadyLoaded = room && room.code === code.toUpperCase();
+  const [loading, setLoading] = useState(!roomAlreadyLoaded);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    // If we already have the room in state, just mark as loaded
-    if (room && room.code === code.toUpperCase()) {
-      setLoading(false);
+    // If we already have the room in state, nothing to fetch
+    if (roomAlreadyLoaded) {
       return;
     }
 
@@ -45,14 +45,14 @@ export default function PlayPage() {
         const players = data.room.room_players || [];
         initGame(data.room, playerId, players);
         setLoading(false);
-      } catch (err) {
+      } catch {
         setError('Failed to load room');
         setLoading(false);
       }
     }
 
     fetchRoom();
-  }, [code, room, playerId, setRoom, initGame, router]);
+  }, [code, roomAlreadyLoaded, playerId, setRoom, initGame, router]);
 
   if (loading) {
     return (

@@ -32,11 +32,13 @@ export interface Room {
 }
 
 export interface RoomPlayer {
+  id: string;
   room_id: string;
   user_id: string;
   chain: string[];
   finished_at: string | null;
   is_winner: boolean;
+  wants_rematch: boolean;
 }
 
 export interface GameState {

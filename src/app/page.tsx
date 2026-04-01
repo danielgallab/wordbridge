@@ -45,7 +45,7 @@ export default function Home() {
 
       // Navigate to game
       router.push(`/play/${data.room.code}`);
-    } catch (err) {
+    } catch {
       setError('Network error. Please try again.');
       setIsCreating(false);
     }
@@ -90,7 +90,7 @@ export default function Home() {
 
       // Navigate to game
       router.push(`/play/${data.room.code}`);
-    } catch (err) {
+    } catch {
       setError('Network error. Please try again.');
       setIsJoining(false);
     }

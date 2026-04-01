@@ -116,7 +116,7 @@ export function useGameRoom(roomId: string | null) {
           // Handle rematch - room status changed to playing with new words
           // Check BEFORE updating room state so prevRoom comparison works
           if (updated.status === 'playing' && prevRoom?.status === 'finished') {
-            resetForRematch(updated.start_word, updated.target_word);
+            resetForRematch(updated.start_word);
             // Also refetch players to get their reset state
             fetchPlayers();
           }
@@ -181,6 +181,7 @@ export function useGameRoom(roomId: string | null) {
         clearInterval(timerRef.current);
       }
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- room object reference changes frequently, we only want to react to status changes
   }, [room?.status, isGameOver, tick]);
 
   const getOpponent = useCallback(() => {
