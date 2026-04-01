@@ -1,26 +1,99 @@
 @import "tailwindcss";
 
 :root {
+  /* Light mode - Wordle inspired */
   --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --surface: #f5f5f5;
+  --border: #d3d6da;
+  --text: #1a1a1b;
+  --text-muted: #787c7e;
+  --correct: #6aaa64;
+  --present: #c9b458;
+  --absent: #787c7e;
+  --error: #ff4444;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    /* Dark mode - Wordle inspired */
+    --background: #121213;
+    --surface: #1a1a1b;
+    --border: #3a3a3c;
+    --text: #ffffff;
+    --text-muted: #818384;
+    --correct: #538d4e;
+    --present: #b59f3b;
+    --absent: #565758;
+    --error: #ff4444;
   }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+  --color-foreground: var(--text);
+  --color-muted: var(--text-muted);
+  --color-correct: var(--correct);
+  --color-present: var(--present);
+  --color-absent: var(--absent);
+  --color-error: var(--error);
+  --font-sans: system-ui, -apple-system, sans-serif;
+  --font-mono: ui-monospace, monospace;
 }
 
 body {
   background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  color: var(--text);
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+/* Game-specific utility classes */
+.word-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  text-transform: uppercase;
+  border: 2px solid var(--border);
+  background: var(--surface);
+  transition: all 0.15s ease;
+}
+
+.word-tile.correct {
+  background: var(--correct);
+  border-color: var(--correct);
+  color: white;
+}
+
+.word-tile.start {
+  background: var(--present);
+  border-color: var(--present);
+  color: white;
+}
+
+.word-tile.target {
+  background: var(--correct);
+  border-color: var(--correct);
+  color: white;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+
+@keyframes pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+.shake {
+  animation: shake 0.3s ease;
+}
+
+.pop {
+  animation: pop 0.15s ease;
 }
