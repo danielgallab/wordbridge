@@ -205,17 +205,19 @@ export default function WordWebPage() {
       components.get(root)!.push(node.id);
     }
 
-    // Create a map of nodeId -> componentId (index)
+    // Sort components by size (largest first) so biggest webs get centered
+    const sortedComponents = Array.from(components.values()).sort((a, b) => b.length - a.length);
+    const componentSizes = sortedComponents.map(c => c.length);
+
+    // Create a map of nodeId -> componentId (index, where 0 = largest)
     const nodeToComponent = new Map<string, number>();
-    let componentIndex = 0;
-    for (const nodeIds of components.values()) {
+    sortedComponents.forEach((nodeIds, componentIndex) => {
       for (const nodeId of nodeIds) {
         nodeToComponent.set(nodeId, componentIndex);
       }
-      componentIndex++;
-    }
+    });
 
-    return { nodeToComponent, componentCount: components.size };
+    return { nodeToComponent, componentCount: components.size, componentSizes };
   }, []);
 
   // Force simulation
@@ -226,34 +228,56 @@ export default function WordWebPage() {
     // Use a ref to track current nodes to avoid stale closure
     const nodesRef = { current: nodes };
 
-    // Find connected components once
-    const { nodeToComponent, componentCount } = findConnectedComponents(nodes, edges);
+    // Find connected components once (sorted by size, largest first)
+    const { nodeToComponent, componentCount, componentSizes } = findConnectedComponents(nodes, edges);
 
-    // Calculate component centers for layout - arrange in a grid with generous spacing
-    // Use a larger virtual canvas so components can spread beyond the viewport
-    const spreadFactor = Math.max(2, Math.sqrt(componentCount)); // More components = more spread
-    const virtualWidth = dimensions.width * spreadFactor;
-    const virtualHeight = dimensions.height * spreadFactor;
-    const virtualOffsetX = (virtualWidth - dimensions.width) / 2;
-    const virtualOffsetY = (virtualHeight - dimensions.height) / 2;
+    // Calculate component centers - largest in center, others in rings around it
+    const centerX = dimensions.width / 2;
+    const centerY = dimensions.height / 2;
+
+    // Base radius for arranging components - scales with component count but stays reasonable
+    const baseRadius = Math.min(dimensions.width, dimensions.height) * 0.4;
+    const ringSpacing = Math.min(dimensions.width, dimensions.height) * 0.35;
 
     const getComponentTargetCenter = (componentId: number) => {
-      if (componentCount === 1) {
-        return { x: dimensions.width / 2, y: dimensions.height / 2 };
+      // Largest component (id 0) goes in the center
+      if (componentId === 0 || componentCount === 1) {
+        return { x: centerX, y: centerY };
       }
 
-      // Arrange components in a grid pattern across the larger virtual canvas
-      const cols = Math.ceil(Math.sqrt(componentCount));
-      const rows = Math.ceil(componentCount / cols);
-      const col = componentId % cols;
-      const row = Math.floor(componentId / cols);
+      // Arrange other components in concentric rings around the center
+      const remainingCount = componentCount - 1;
 
-      const cellWidth = virtualWidth / cols;
-      const cellHeight = virtualHeight / rows;
+      // Determine which ring this component is in and its position
+      let ring = 1;
+      let positionInRing = componentId - 1;
+      let componentsInThisRing = Math.min(6, remainingCount); // First ring has up to 6
+
+      while (positionInRing >= componentsInThisRing && componentsInThisRing > 0) {
+        positionInRing -= componentsInThisRing;
+        ring++;
+        // Each subsequent ring can hold more components
+        const usedSoFar = ring === 2 ? Math.min(6, remainingCount) : componentsInThisRing;
+        componentsInThisRing = Math.min(6 * ring, remainingCount - usedSoFar);
+      }
+
+      // Recalculate how many are actually in this ring for even spacing
+      let startOfRing = 0;
+      for (let r = 1; r < ring; r++) {
+        startOfRing += Math.min(6 * r, remainingCount - startOfRing);
+      }
+      const actualInThisRing = Math.min(6 * ring, remainingCount - startOfRing);
+
+      const angle = (positionInRing / Math.max(1, actualInThisRing)) * Math.PI * 2 - Math.PI / 2;
+      const radius = baseRadius + (ring - 1) * ringSpacing;
+
+      // Scale radius by component size - smaller components can be pushed out more
+      const sizeRatio = componentSizes[componentId] / componentSizes[0];
+      const adjustedRadius = radius * (1 + (1 - sizeRatio) * 0.3);
 
       return {
-        x: cellWidth * (col + 0.5) - virtualOffsetX,
-        y: cellHeight * (row + 0.5) - virtualOffsetY,
+        x: centerX + Math.cos(angle) * adjustedRadius,
+        y: centerY + Math.sin(angle) * adjustedRadius,
       };
     };
 
