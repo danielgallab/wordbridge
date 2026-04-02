@@ -19,6 +19,8 @@ export interface WordAssociation {
   validated_at: string;
 }
 
+export type Difficulty = 'easy' | 'medium' | 'hard';
+
 export interface Room {
   id: string;
   code: string;
@@ -26,6 +28,7 @@ export interface Room {
   start_word: string;
   target_word: string;
   time_limit: number;
+  difficulty: Difficulty;
   created_at: string;
   started_at: string | null;
   finished_at: string | null;

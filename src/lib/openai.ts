@@ -58,11 +58,21 @@ INVALID - REJECT these:
 
 BE STRICT about weak/indirect connections, but DO NOT overthink obvious pairs. If the connection is immediately clear to most people (like drink/water, eat/food), accept it. Don't reject based on grammatical technicalities like "verb vs noun" — focus on whether the conceptual link is obvious.
 
+REJECTION REASONS - When rejecting, you MUST provide a rejection_reason:
+- "not_related": No meaningful connection exists between the words
+- "too_abstract": Connection exists but is too conceptual/philosophical
+- "multi_hop": Connection requires intermediate steps (e.g., tree→leg needs tree→wood→furniture→leg)
+- "proper_noun": Word is a proper noun (name, place, brand)
+- "misspelled": Word appears to be misspelled
+- "invalid_word": Not a recognizable English word
+
 Examples:
 - fire,hot = YES (direct property)
 - rain,umbrella = YES (immediate association)
 - brick,wall = YES (bricks make walls)
-- brick,skyscraper = NO (too indirect - skyscrapers aren't made of bricks)
-- tree,leg = NO (requires multi-hop: tree→furniture→legs)
-- computer,elephant = NO (no connection)
-- green,cs = NO (cs is not a word)`;
+- brick,skyscraper = NO, rejection_reason: "too_abstract" (too indirect - skyscrapers aren't made of bricks)
+- tree,leg = NO, rejection_reason: "multi_hop" (requires multi-hop: tree→furniture→legs)
+- computer,elephant = NO, rejection_reason: "not_related" (no connection)
+- green,cs = NO, rejection_reason: "invalid_word" (cs is not a word)
+- paris,tower = NO, rejection_reason: "proper_noun" (Paris is a proper noun)
+- speling,word = NO, rejection_reason: "misspelled" (speling is misspelled)`;

@@ -4,9 +4,27 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import { z } from 'zod';
 
+export type RejectionReason =
+  | 'not_related'
+  | 'already_used'
+  | 'invalid_word'
+  | 'same_as_previous'
+  | 'too_abstract'
+  | 'proper_noun'
+  | 'multi_hop'
+  | 'misspelled';
+
 const WordAssociationResult = z.object({
   reasoning: z.string(),
   related: z.boolean(),
+  rejection_reason: z.enum([
+    'not_related',
+    'too_abstract',
+    'multi_hop',
+    'proper_noun',
+    'misspelled',
+    'invalid_word',
+  ]).nullable(),
 });
 
 export async function POST(request: NextRequest) {
@@ -30,16 +48,16 @@ export async function POST(request: NextRequest) {
 
     // Basic validation
     if (w1 === w2) {
-      return NextResponse.json({ isValid: false, cached: false });
+      return NextResponse.json({ isValid: false, cached: false, reason: 'same_as_previous' });
     }
 
     if (!/^[a-z]+$/.test(w1) || !/^[a-z]+$/.test(w2)) {
-      return NextResponse.json({ isValid: false, cached: false });
+      return NextResponse.json({ isValid: false, cached: false, reason: 'invalid_word' });
     }
 
     // Reject very short words (likely abbreviations) and very long words
     if (w1.length < 2 || w2.length < 2 || w1.length > 20 || w2.length > 20) {
-      return NextResponse.json({ isValid: false, cached: false });
+      return NextResponse.json({ isValid: false, cached: false, reason: 'invalid_word' });
     }
 
     start = performance.now();
@@ -50,7 +68,7 @@ export async function POST(request: NextRequest) {
     start = performance.now();
     const { data: cached } = await supabase
       .from('word_associations')
-      .select('is_valid')
+      .select('is_valid, rejection_reason')
       .or(`and(word1.eq.${w1},word2.eq.${w2}),and(word1.eq.${w2},word2.eq.${w1})`)
       .limit(1)
       .single();
@@ -59,7 +77,11 @@ export async function POST(request: NextRequest) {
     if (cached !== null) {
       timings['total'] = performance.now() - totalStart;
       console.log(`[Validate Word] "${w1}" <-> "${w2}" | CACHE HIT | Timings (ms):`, JSON.stringify(timings));
-      return NextResponse.json({ isValid: cached.is_valid, cached: true });
+      return NextResponse.json({
+        isValid: cached.is_valid,
+        cached: true,
+        reason: cached.rejection_reason || (cached.is_valid ? undefined : 'not_related'),
+      });
     }
 
     // Call OpenAI gpt-5.4-mini with structured output (optimized for speed)
@@ -82,29 +104,37 @@ export async function POST(request: NextRequest) {
 
     const content = response.choices[0]?.message?.content;
     let isValid = false;
+    let rejectionReason: string | undefined;
     if (content) {
       try {
         const parsed = JSON.parse(content);
         isValid = parsed.related === true;
-        console.log(`[Word Validation] "${w1}" <-> "${w2}": ${isValid ? 'VALID' : 'INVALID'} | Reasoning: ${parsed.reasoning}`);
+        rejectionReason = parsed.rejection_reason;
+        console.log(`[Word Validation] "${w1}" <-> "${w2}": ${isValid ? 'VALID' : 'INVALID'} | Reasoning: ${parsed.reasoning} | Rejection: ${rejectionReason || 'none'}`);
       } catch {
         isValid = false;
+        rejectionReason = 'invalid_word';
       }
     }
 
-    // Cache the result
+    // Cache the result (including rejection reason)
     start = performance.now();
     await supabase.from('word_associations').insert({
       word1: w1,
       word2: w2,
       is_valid: isValid,
+      rejection_reason: rejectionReason,
     });
     timings['cacheInsert'] = performance.now() - start;
 
     timings['total'] = performance.now() - totalStart;
     console.log(`[Validate Word] "${w1}" <-> "${w2}" | CACHE MISS | Timings (ms):`, JSON.stringify(timings));
 
-    return NextResponse.json({ isValid, cached: false });
+    return NextResponse.json({
+      isValid,
+      cached: false,
+      reason: isValid ? undefined : (rejectionReason || 'not_related'),
+    });
   } catch (error) {
     console.error('Word validation error:', error);
     return NextResponse.json(

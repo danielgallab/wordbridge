@@ -13,6 +13,7 @@ export default function Home() {
 
   const [playerName, setPlayerName] = useState('');
   const [joinCode, setJoinCode] = useState('');
+  const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState('');
@@ -30,7 +31,7 @@ export default function Home() {
       const res = await fetch('/api/rooms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ playerName: playerName.trim() }),
+        body: JSON.stringify({ playerName: playerName.trim(), difficulty }),
       });
 
       const data = await res.json();
@@ -124,6 +125,30 @@ export default function Home() {
             maxLength={16}
             className="w-full px-4 py-3 rounded-md bg-[var(--background)] border-2 border-[var(--border)] text-[var(--text)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--correct)] mb-4"
           />
+
+          {/* Difficulty selector */}
+          <label className="block text-xs uppercase tracking-wider text-[var(--text-muted)] font-bold mb-2">
+            Difficulty
+          </label>
+          <div className="flex gap-2 mb-4">
+            {(['easy', 'medium', 'hard'] as const).map((d) => (
+              <button
+                key={d}
+                onClick={() => setDifficulty(d)}
+                className={`flex-1 py-2 rounded-md font-bold text-sm capitalize transition-all ${
+                  difficulty === d
+                    ? d === 'easy'
+                      ? 'bg-[var(--correct)] text-white'
+                      : d === 'medium'
+                      ? 'bg-[var(--present)] text-white'
+                      : 'bg-[var(--error)] text-white'
+                    : 'bg-[var(--background)] border-2 border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--text-muted)]'
+                }`}
+              >
+                {d}
+              </button>
+            ))}
+          </div>
 
           {/* Create Room button */}
           <button

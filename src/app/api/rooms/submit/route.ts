@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
 
     // Don't allow duplicates
     if (currentChain.includes(newWord)) {
-      return NextResponse.json({ error: 'Word already in chain' }, { status: 400 });
+      return NextResponse.json({ error: 'Already used', reason: 'already_used' }, { status: 400 });
     }
 
     // Validate word association via our API
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
 
     if (!validateData.isValid) {
       return NextResponse.json(
-        { error: `"${newWord}" is not associated with "${lastWord}"` },
+        { error: `"${newWord}" is not associated with "${lastWord}"`, reason: validateData.reason },
         { status: 400 }
       );
     }

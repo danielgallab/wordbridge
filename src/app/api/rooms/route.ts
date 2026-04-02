@@ -13,8 +13,15 @@ const WordPairResult = z.object({
 
 type Difficulty = 'easy' | 'medium' | 'hard';
 
+// Characters that are visually distinct (no 0/O, 1/I/L confusion)
+const ROOM_CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+
 function generateRoomCode(): string {
-  return Math.random().toString(36).substring(2, 6).toUpperCase();
+  let code = '';
+  for (let i = 0; i < 4; i++) {
+    code += ROOM_CODE_CHARS.charAt(Math.floor(Math.random() * ROOM_CODE_CHARS.length));
+  }
+  return code;
 }
 
 async function getRecentlyUsedWords(supabase: SupabaseClient): Promise<string[]> {
@@ -39,7 +46,6 @@ async function getRecentlyUsedWords(supabase: SupabaseClient): Promise<string[]>
 
 async function generateWordPair(supabase: SupabaseClient, difficulty: Difficulty = 'medium') {
   const openai = getOpenAI();
-  const randomId = Math.random().toString(36).substring(2, 10);
   const recentWords = await getRecentlyUsedWords(supabase);
 
   let avoidClause = '';
@@ -113,6 +119,7 @@ export async function POST(request: NextRequest) {
         status: 'waiting',
         start_word: wordPair.start_word,
         target_word: wordPair.target_word,
+        difficulty,
       })
       .select()
       .single();

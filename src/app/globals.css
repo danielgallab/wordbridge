@@ -97,3 +97,18 @@ body {
 .pop {
   animation: pop 0.15s ease;
 }
+
+@keyframes arrow-appear {
+  0% {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-arrow-appear {
+  animation: arrow-appear 0.2s ease-out;
+}

@@ -2,6 +2,27 @@ import { create } from 'zustand';
 
 const TOTAL_TIME = 90;
 
+export type RejectionReason =
+  | 'not_related'
+  | 'already_used'
+  | 'invalid_word'
+  | 'same_as_previous'
+  | 'too_abstract'
+  | 'proper_noun'
+  | 'multi_hop'
+  | 'misspelled';
+
+const REJECTION_MESSAGES: Record<RejectionReason, string> = {
+  not_related: 'Not related enough',
+  already_used: 'Already used',
+  invalid_word: 'Not a valid word',
+  same_as_previous: 'Same as previous word',
+  too_abstract: 'Connection too abstract',
+  proper_noun: 'Proper nouns not allowed',
+  multi_hop: 'Needs intermediate steps',
+  misspelled: 'Check your spelling',
+};
+
 interface Player {
   id: string;
   player_name: string;
@@ -17,6 +38,7 @@ interface Room {
   start_word: string;
   target_word: string;
   time_limit: number;
+  difficulty?: 'easy' | 'medium' | 'hard';
   winner_id: string | null;
 }
 
@@ -217,8 +239,13 @@ export const useGameStore = create<GameState>((set, get) => ({
 
       if (!response.ok) {
         // Rollback optimistic update on error
+        // Use rejection reason to show user-friendly message
+        const reason = data.reason as RejectionReason | undefined;
+        const errorMessage = reason && REJECTION_MESSAGES[reason]
+          ? REJECTION_MESSAGES[reason]
+          : (data.error || 'Failed to submit word');
         set({
-          error: data.error || 'Failed to submit word',
+          error: errorMessage,
           isValidating: false,
           myChain: previousChain  // Restore previous chain
         });

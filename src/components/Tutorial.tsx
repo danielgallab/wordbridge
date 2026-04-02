@@ -61,6 +61,32 @@ const TUTORIAL_STEPS = [
     ),
   },
   {
+    title: 'Words Must Connect',
+    description: 'Each word must be directly related to the previous one. Weak connections will be rejected!',
+    visual: (
+      <div className="flex flex-col gap-2.5 py-4 text-sm">
+        <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-[var(--correct)]/10 border border-[var(--correct)]/30">
+          <span className="text-[var(--correct)] font-bold">✓</span>
+          <span>CAT → PET</span>
+          <span className="text-xs text-[var(--text-muted)] ml-auto">(direct)</span>
+        </div>
+        <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-[var(--error)]/10 border border-[var(--error)]/30 opacity-75">
+          <span className="text-[var(--error)] font-bold">✗</span>
+          <span className="line-through">CAT → ROCKET</span>
+          <span className="text-xs text-[var(--error)] ml-auto">no connection</span>
+        </div>
+        <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-[var(--error)]/10 border border-[var(--error)]/30 opacity-75">
+          <span className="text-[var(--error)] font-bold">✗</span>
+          <span className="line-through">TREE → LEG</span>
+          <span className="text-xs text-[var(--error)] ml-auto">too indirect</span>
+        </div>
+        <p className="text-xs text-[var(--text-muted)] text-center mt-1">
+          TREE→LEG needs: tree→wood→furniture→leg
+        </p>
+      </div>
+    ),
+  },
+  {
     title: 'Shortest Chain Wins',
     description: 'Race against your opponent! The player with the shortest chain when time runs out wins.',
     visual: (

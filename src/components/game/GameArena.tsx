@@ -1,11 +1,12 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Timer } from './Timer';
 import { PlayerPanel } from './PlayerPanel';
 import { useGameStore } from '@/stores/gameStore';
 import { useGameRoom } from '@/hooks/useGameRoom';
+import { calculatePathQuality } from '@/lib/scoring';
 
 const TOTAL_TIME = 90;
 
@@ -40,6 +41,59 @@ export function GameArena() {
   const opponentWantsRematch = rematchStatus === 'pending';
   const isRematchStarting = rematchStatus === 'starting';
   const showGameOver = isFinished && rematchStatus !== 'starting';
+
+  // Delay showing rematch UI so both players can see chains first
+  const [showRematchUI, setShowRematchUI] = useState(false);
+  const [shareStatus, setShareStatus] = useState<'idle' | 'copied'>('idle');
+  const [gameOverKey, setGameOverKey] = useState(0);
+
+  // Reset showRematchUI when game over state changes
+  useEffect(() => {
+    if (showGameOver) {
+      setGameOverKey(prev => prev + 1);
+    }
+  }, [showGameOver]);
+
+  // Delay showing rematch UI after game over
+  useEffect(() => {
+    if (!showGameOver) {
+      return;
+    }
+    setShowRematchUI(false);
+    const timer = setTimeout(() => setShowRematchUI(true), 2500);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameOverKey]);
+
+  // Calculate path quality for display
+  const pathQuality = myChain.length > 1
+    ? calculatePathQuality(myChain.length, room?.difficulty || 'medium')
+    : null;
+
+  const handleShare = async () => {
+    const shareText = `WordBridge: ${room?.start_word.toUpperCase()} → ${room?.target_word.toUpperCase()}\n` +
+      `My chain (${myChain.length - 1} steps): ${myChain.join(' → ')}\n` +
+      `Play at: wordbridge.app`;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({ text: shareText });
+      } else {
+        await navigator.clipboard.writeText(shareText);
+        setShareStatus('copied');
+        setTimeout(() => setShareStatus('idle'), 2000);
+      }
+    } catch {
+      // User cancelled or error - try clipboard as fallback
+      try {
+        await navigator.clipboard.writeText(shareText);
+        setShareStatus('copied');
+        setTimeout(() => setShareStatus('idle'), 2000);
+      } catch {
+        // Clipboard not available
+      }
+    }
+  };
 
   const handleSubmitWord = useCallback(
     async (word: string) => {
@@ -106,6 +160,21 @@ export function GameArena() {
               {room.target_word}
             </span>
           </div>
+          {room.difficulty && (
+            <div className="flex justify-center mt-1">
+              <span
+                className={`text-xs px-2 py-0.5 rounded font-bold uppercase ${
+                  room.difficulty === 'easy'
+                    ? 'bg-[var(--correct)]/20 text-[var(--correct)]'
+                    : room.difficulty === 'medium'
+                    ? 'bg-[var(--present)]/20 text-[var(--present)]'
+                    : 'bg-[var(--error)]/20 text-[var(--error)]'
+                }`}
+              >
+                {room.difficulty}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -148,7 +217,7 @@ export function GameArena() {
       {/* Game Over Overlay */}
       {showGameOver && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-          <div className="bg-[var(--background)] border-2 border-[var(--border)] rounded-xl p-4 sm:p-8 text-center max-w-sm w-full mx-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-[var(--background)] border-2 border-[var(--border)] rounded-xl p-4 sm:p-8 text-center max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
             <div className="text-4xl sm:text-5xl mb-3 sm:mb-4">
               {winner === 'me' ? '🏆' : winner === 'opponent' ? '💀' : '🤝'}
             </div>
@@ -163,59 +232,90 @@ export function GameArena() {
             >
               {winner === 'me' ? 'You Win!' : winner === 'opponent' ? `${opponentName} Wins` : 'Draw!'}
             </h2>
-            <p className="text-sm sm:text-base text-[var(--text-muted)] mb-3 sm:mb-4">
-              {winner === 'me'
-                ? `Your chain: ${myChain.length - 1} steps`
-                : winner === 'opponent'
-                ? `${opponentName}'s chain: ${opponentChain.length - 1} steps`
-                : 'Same number of steps!'}
-            </p>
 
-            {myChain.length > 1 && (
-              <div className="bg-[var(--surface)] rounded-lg p-2 sm:p-3 mb-3 sm:mb-4 text-left">
-                <div className="text-xs uppercase text-[var(--text-muted)] mb-1 font-bold">
-                  Your chain
-                </div>
-                <div className="font-mono text-xs sm:text-sm text-[var(--present)] break-words">
-                  {myChain.join(' → ')}
-                </div>
+            {/* Path quality rating */}
+            {pathQuality && winner === 'me' && (
+              <div className="mb-3">
+                <span className="text-2xl">{pathQuality.emoji}</span>
+                <p className="text-sm text-[var(--text-muted)]">{pathQuality.description}</p>
               </div>
             )}
 
-            {opponentChain.length > 1 && (
-              <div className="bg-[var(--surface)] rounded-lg p-2 sm:p-3 mb-3 sm:mb-4 text-left">
-                <div className="text-xs uppercase text-[var(--text-muted)] mb-1 font-bold">
-                  {opponentName}&apos;s chain
+            {/* Side-by-side chain comparison */}
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              {myChain.length > 1 && (
+                <div className="bg-[var(--surface)] rounded-lg p-2 sm:p-3 text-left">
+                  <div className="text-xs uppercase text-[var(--text-muted)] mb-1 font-bold">
+                    You ({myChain.length - 1} steps)
+                  </div>
+                  <div className="font-mono text-xs text-[var(--present)] break-words">
+                    {myChain.join(' → ')}
+                  </div>
                 </div>
-                <div className="font-mono text-xs sm:text-sm text-[var(--text-muted)] break-words">
-                  {opponentChain.join(' → ')}
-                </div>
-              </div>
-            )}
+              )}
 
-            {wantsRematch || isRematchStarting ? (
-              <div className="w-full py-3 rounded-md bg-[var(--surface)] border border-[var(--border)] text-[var(--text)] font-bold mb-3 flex items-center justify-center gap-2">
-                {isRematchStarting ? (
-                  <>Starting rematch...</>
-                ) : (
-                  <>
-                    Waiting for {opponentName}
-                    <span className="flex gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: '300ms' }} />
-                    </span>
-                  </>
-                )}
-              </div>
-            ) : (
-              <button
-                onClick={requestRematch}
-                className="w-full py-3 rounded-md bg-[var(--correct)] text-white font-bold hover:opacity-90 transition-opacity mb-3"
+              {opponentChain.length > 1 && (
+                <div className="bg-[var(--surface)] rounded-lg p-2 sm:p-3 text-left">
+                  <div className="text-xs uppercase text-[var(--text-muted)] mb-1 font-bold">
+                    {opponentName} ({opponentChain.length - 1} steps)
+                  </div>
+                  <div className="font-mono text-xs text-[var(--text-muted)] break-words">
+                    {opponentChain.join(' → ')}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Share button */}
+            <button
+              onClick={handleShare}
+              className="w-full py-2 rounded-md bg-[var(--surface)] border border-[var(--border)] text-[var(--text)] font-bold hover:opacity-90 transition-opacity mb-3 flex items-center justify-center gap-2"
+            >
+              <svg
+                className="w-4 h-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
               >
-                {opponentWantsRematch ? `${opponentName} wants a rematch!` : 'Play Again'}
-              </button>
+                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                <polyline points="16 6 12 2 8 6" />
+                <line x1="12" y1="2" x2="12" y2="15" />
+              </svg>
+              {shareStatus === 'copied' ? 'Copied!' : 'Share Result'}
+            </button>
+
+            {/* Rematch UI - delayed appearance */}
+            {showRematchUI && (
+              <>
+                {wantsRematch || isRematchStarting ? (
+                  <div className="w-full py-3 rounded-md bg-[var(--surface)] border border-[var(--border)] text-[var(--text)] font-bold mb-3 flex items-center justify-center gap-2">
+                    {isRematchStarting ? (
+                      <>Starting rematch...</>
+                    ) : (
+                      <>
+                        Waiting for {opponentName}
+                        <span className="flex gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: '0ms' }} />
+                          <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: '150ms' }} />
+                          <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: '300ms' }} />
+                        </span>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <button
+                    onClick={requestRematch}
+                    className="w-full py-3 rounded-md bg-[var(--correct)] text-white font-bold hover:opacity-90 transition-opacity mb-3"
+                  >
+                    {opponentWantsRematch ? `${opponentName} wants a rematch!` : 'Play Again'}
+                  </button>
+                )}
+              </>
             )}
+
             <button
               onClick={handleGoHome}
               className="w-full py-3 rounded-md bg-[var(--surface)] border border-[var(--border)] text-[var(--text)] font-bold hover:opacity-90 transition-opacity"
