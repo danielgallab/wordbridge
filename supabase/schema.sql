@@ -45,11 +45,26 @@ CREATE TABLE IF NOT EXISTS word_associations (
   UNIQUE(word1, word2)
 );
 
+-- Cached word pairs for game generation
+CREATE TABLE IF NOT EXISTS word_pairs (
+  id SERIAL PRIMARY KEY,
+  start_word TEXT NOT NULL,
+  target_word TEXT NOT NULL,
+  difficulty TEXT NOT NULL CHECK (difficulty IN ('easy', 'medium', 'hard')),
+  reasoning TEXT,
+  used_count INT DEFAULT 0,
+  last_used_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(start_word, target_word)
+);
+
 -- Create indexes for performance
 CREATE INDEX IF NOT EXISTS idx_rooms_code ON rooms(code);
 CREATE INDEX IF NOT EXISTS idx_rooms_status ON rooms(status);
 CREATE INDEX IF NOT EXISTS idx_room_players_room ON room_players(room_id);
 CREATE INDEX IF NOT EXISTS idx_word_associations_words ON word_associations(word1, word2);
+CREATE INDEX IF NOT EXISTS idx_word_pairs_difficulty ON word_pairs(difficulty);
+CREATE INDEX IF NOT EXISTS idx_word_pairs_used ON word_pairs(used_count, last_used_at);
 
 -- Enable realtime for multiplayer
 ALTER PUBLICATION supabase_realtime ADD TABLE rooms;
@@ -66,3 +81,4 @@ CREATE POLICY "Allow all for rooms" ON rooms FOR ALL USING (true) WITH CHECK (tr
 CREATE POLICY "Allow all for room_players" ON room_players FOR ALL USING (true) WITH CHECK (true);
 -- CREATE POLICY "Allow all for word_pairs" ON word_pairs FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all for word_associations" ON word_associations FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all for word_pairs" ON word_pairs FOR ALL USING (true) WITH CHECK (true);

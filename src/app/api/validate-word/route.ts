@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOpenAI, WORD_VALIDATION_PROMPT } from '@/lib/openai';
 import { createServiceClient } from '@/lib/supabase/server';
+import { singularize } from '@/lib/singularize';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import { z } from 'zod';
 
@@ -43,8 +44,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const w1 = word1.toLowerCase().trim();
-    const w2 = word2.toLowerCase().trim();
+    // Singularize words to normalize plurals (e.g., "hands" -> "hand")
+    const w1 = singularize(word1.toLowerCase().trim());
+    const w2 = singularize(word2.toLowerCase().trim());
 
     // Basic validation
     if (w1 === w2) {

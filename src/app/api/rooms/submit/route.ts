@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
+import { singularize } from '@/lib/singularize';
 
 // POST /api/rooms/submit - Submit a word to the chain
 export async function POST(request: NextRequest) {
@@ -44,7 +45,8 @@ export async function POST(request: NextRequest) {
 
     const currentChain = player.chain || [];
     const lastWord = currentChain[currentChain.length - 1];
-    const newWord = word.trim().toLowerCase();
+    // Singularize the word to normalize plurals (e.g., "hands" -> "hand")
+    const newWord = singularize(word.trim().toLowerCase());
 
     // Don't allow duplicates
     if (currentChain.includes(newWord)) {
