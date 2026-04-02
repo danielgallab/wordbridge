@@ -3,10 +3,13 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useGameStore } from '@/stores/gameStore';
+import { Tutorial } from '@/components/Tutorial';
+import { useTutorial } from '@/hooks/useTutorial';
 
 export default function Home() {
   const router = useRouter();
   const { setRoom, setPlayer, initGame } = useGameStore();
+  const { showTutorial, isLoaded, closeTutorial, openTutorial } = useTutorial();
 
   const [playerName, setPlayerName] = useState('');
   const [joinCode, setJoinCode] = useState('');
@@ -166,16 +169,34 @@ export default function Home() {
           )}
         </div>
 
-        {/* How to play */}
-        <div className="mt-6 text-center text-sm text-[var(--text-muted)]">
-          <p className="mb-2 font-bold">How to play</p>
-          <p>
-            Build a chain of related words from the start word to the target word.
-            <br />
-            Shortest chain wins!
-          </p>
+        {/* How to play button */}
+        <div className="mt-6 text-center">
+          <button
+            onClick={openTutorial}
+            className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+              <path d="M12 17h.01" />
+            </svg>
+            How to play
+          </button>
         </div>
       </div>
+
+      {/* Tutorial Modal */}
+      {isLoaded && showTutorial && <Tutorial onClose={closeTutorial} />}
     </main>
   );
 }

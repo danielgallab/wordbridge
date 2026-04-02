@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'WordBridge - Word Association Game',
+  title: 'WordBridge',
   description: 'Connect words in the shortest chain possible. Challenge friends or play against AI.',
 };
 
