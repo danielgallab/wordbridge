@@ -34,7 +34,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Game already started' }, { status: 400 });
     }
 
-    if (room.room_players?.length >= 2) {
+    // Allow up to 8 players per room
+    if (room.room_players?.length >= 8) {
       return NextResponse.json({ error: 'Room is full' }, { status: 400 });
     }
 
@@ -60,17 +61,6 @@ export async function POST(request: NextRequest) {
     if (playerError) {
       console.error('Join room error:', playerError);
       return NextResponse.json({ error: 'Failed to join room' }, { status: 500 });
-    }
-
-    // If room now has 2 players, start the game
-    if (room.room_players?.length === 1) {
-      await supabase
-        .from('rooms')
-        .update({
-          status: 'playing',
-          started_at: new Date().toISOString(),
-        })
-        .eq('id', room.id);
     }
 
     // Refetch room with all players for proper initialization

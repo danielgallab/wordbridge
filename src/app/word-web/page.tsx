@@ -40,9 +40,49 @@ export default function WordWebPage() {
   // Pan and zoom state
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const targetScale = useRef(1);
+  const targetOffset = useRef({ x: 0, y: 0 });
   const isDragging = useRef(false);
   const dragStart = useRef({ x: 0, y: 0 });
   const draggedNode = useRef<Node | null>(null);
+
+  // Smooth zoom animation - use refs to avoid infinite loops
+  const currentScaleRef = useRef(1);
+  const currentOffsetRef = useRef({ x: 0, y: 0 });
+
+  useEffect(() => {
+    let animationId: number;
+    const lerp = (start: number, end: number, t: number) => start + (end - start) * t;
+    const lerpSpeed = 0.15;
+
+    function animateZoom() {
+      const tScale = targetScale.current;
+      const tOffset = targetOffset.current;
+      const cScale = currentScaleRef.current;
+      const cOffset = currentOffsetRef.current;
+
+      // Check if we're close enough to stop animating
+      const scaleDiff = Math.abs(tScale - cScale);
+      const offsetDiff = Math.abs(tOffset.x - cOffset.x) + Math.abs(tOffset.y - cOffset.y);
+
+      if (scaleDiff > 0.001 || offsetDiff > 0.5) {
+        const newScale = lerp(cScale, tScale, lerpSpeed);
+        const newOffset = {
+          x: lerp(cOffset.x, tOffset.x, lerpSpeed),
+          y: lerp(cOffset.y, tOffset.y, lerpSpeed),
+        };
+        currentScaleRef.current = newScale;
+        currentOffsetRef.current = newOffset;
+        setScale(newScale);
+        setOffset(newOffset);
+      }
+
+      animationId = requestAnimationFrame(animateZoom);
+    }
+
+    animateZoom();
+    return () => cancelAnimationFrame(animationId);
+  }, []);
 
   // Fetch data
   useEffect(() => {
@@ -58,15 +98,16 @@ export default function WordWebPage() {
           return;
         }
 
-        // Initialize node positions randomly around center
-        // Use container dimensions if available, otherwise use defaults
+        // Initialize node positions randomly spread across a larger area
+        // This helps the simulation start with components already somewhat separated
         const container = containerRef.current;
         const w = container?.clientWidth || 800;
         const h = container?.clientHeight || 600;
+        const spread = 1.5; // Spread beyond viewport
         const initializedNodes: Node[] = data.nodes.map((n) => ({
           ...n,
-          x: Math.random() * (w * 0.6) + w * 0.2,
-          y: Math.random() * (h * 0.6) + h * 0.2,
+          x: (Math.random() - 0.5) * w * spread + w / 2,
+          y: (Math.random() - 0.5) * h * spread + h / 2,
           vx: 0,
           vy: 0,
         }));
@@ -110,6 +151,73 @@ export default function WordWebPage() {
     };
   }, []);
 
+  // Find connected components using Union-Find
+  const findConnectedComponents = useCallback((nodeList: Node[], edgeList: Edge[]) => {
+    const parent = new Map<string, string>();
+    const rank = new Map<string, number>();
+
+    // Initialize each node as its own parent
+    for (const node of nodeList) {
+      parent.set(node.id, node.id);
+      rank.set(node.id, 0);
+    }
+
+    // Find with path compression
+    function find(x: string): string {
+      if (parent.get(x) !== x) {
+        parent.set(x, find(parent.get(x)!));
+      }
+      return parent.get(x)!;
+    }
+
+    // Union by rank
+    function union(x: string, y: string) {
+      const rootX = find(x);
+      const rootY = find(y);
+      if (rootX === rootY) return;
+
+      const rankX = rank.get(rootX)!;
+      const rankY = rank.get(rootY)!;
+      if (rankX < rankY) {
+        parent.set(rootX, rootY);
+      } else if (rankX > rankY) {
+        parent.set(rootY, rootX);
+      } else {
+        parent.set(rootY, rootX);
+        rank.set(rootX, rankX + 1);
+      }
+    }
+
+    // Union all connected edges
+    for (const edge of edgeList) {
+      if (parent.has(edge.source) && parent.has(edge.target)) {
+        union(edge.source, edge.target);
+      }
+    }
+
+    // Group nodes by their root component
+    const components = new Map<string, string[]>();
+    for (const node of nodeList) {
+      const root = find(node.id);
+      if (!components.has(root)) {
+        components.set(root, []);
+      }
+      components.get(root)!.push(node.id);
+    }
+
+    // Create a map of nodeId -> componentId (index)
+    const nodeToComponent = new Map<string, number>();
+    let componentIndex = 0;
+    for (const nodeIds of components.values()) {
+      for (const nodeId of nodeIds) {
+        nodeToComponent.set(nodeId, componentIndex);
+      }
+      componentIndex++;
+    }
+
+    return { nodeToComponent, componentCount: components.size };
+  }, []);
+
   // Force simulation
   useEffect(() => {
     if (nodes.length === 0) return;
@@ -118,23 +226,54 @@ export default function WordWebPage() {
     // Use a ref to track current nodes to avoid stale closure
     const nodesRef = { current: nodes };
 
+    // Find connected components once
+    const { nodeToComponent, componentCount } = findConnectedComponents(nodes, edges);
+
+    // Calculate component centers for layout - arrange in a grid with generous spacing
+    // Use a larger virtual canvas so components can spread beyond the viewport
+    const spreadFactor = Math.max(2, Math.sqrt(componentCount)); // More components = more spread
+    const virtualWidth = dimensions.width * spreadFactor;
+    const virtualHeight = dimensions.height * spreadFactor;
+    const virtualOffsetX = (virtualWidth - dimensions.width) / 2;
+    const virtualOffsetY = (virtualHeight - dimensions.height) / 2;
+
+    const getComponentTargetCenter = (componentId: number) => {
+      if (componentCount === 1) {
+        return { x: dimensions.width / 2, y: dimensions.height / 2 };
+      }
+
+      // Arrange components in a grid pattern across the larger virtual canvas
+      const cols = Math.ceil(Math.sqrt(componentCount));
+      const rows = Math.ceil(componentCount / cols);
+      const col = componentId % cols;
+      const row = Math.floor(componentId / cols);
+
+      const cellWidth = virtualWidth / cols;
+      const cellHeight = virtualHeight / rows;
+
+      return {
+        x: cellWidth * (col + 0.5) - virtualOffsetX,
+        y: cellHeight * (row + 0.5) - virtualOffsetY,
+      };
+    };
+
     function simulate() {
       const currentNodes = nodesRef.current;
       const updatedNodes = currentNodes.map(n => ({ ...n })); // Deep copy
       const nodeMap = new Map(updatedNodes.map((n) => [n.id, n]));
 
       const dampening = 0.85;
-      const repulsion = 1500;
-      const attraction = 0.01;
-      const centerForce = 0.002;
-      const minDistance = 50; // Minimum distance to prevent extreme forces
+      const repulsion = 2500; // Increased for more spacing within components
+      const attraction = 0.008; // Slightly reduced to allow more spread
+      const centerForce = 0.002; // Reduced to allow more natural spreading
+      const interComponentRepulsion = 8000; // Strong repulsion between different components
+      const minDistance = 60; // Increased minimum distance
       const maxVelocity = 10; // Cap velocity to prevent flying nodes
-      const centerX = dimensions.width / 2;
-      const centerY = dimensions.height / 2;
 
       // Apply forces
       for (let i = 0; i < updatedNodes.length; i++) {
         const node = updatedNodes[i];
+        const nodeComponent = nodeToComponent.get(node.id) ?? 0;
 
         // Skip if being dragged
         if (draggedNode.current?.id === node.id) continue;
@@ -146,13 +285,19 @@ export default function WordWebPage() {
         for (let j = 0; j < updatedNodes.length; j++) {
           if (i === j) continue;
           const other = updatedNodes[j];
+          const otherComponent = nodeToComponent.get(other.id) ?? 0;
           const dx = node.x - other.x;
           const dy = node.y - other.y;
           const distSq = dx * dx + dy * dy;
           const dist = Math.sqrt(distSq) || 1;
           // Use minimum distance to prevent extreme repulsion
           const effectiveDist = Math.max(dist, minDistance);
-          const force = repulsion / (effectiveDist * effectiveDist);
+
+          // Apply stronger repulsion between nodes in different components
+          const repulsionStrength = nodeComponent !== otherComponent
+            ? interComponentRepulsion
+            : repulsion;
+          const force = repulsionStrength / (effectiveDist * effectiveDist);
           fx += (dx / dist) * force;
           fy += (dy / dist) * force;
         }
@@ -177,9 +322,10 @@ export default function WordWebPage() {
           }
         }
 
-        // Center gravity
-        fx += (centerX - node.x) * centerForce;
-        fy += (centerY - node.y) * centerForce;
+        // Component-aware center gravity - each component has its own target center
+        const targetCenter = getComponentTargetCenter(nodeComponent);
+        fx += (targetCenter.x - node.x) * centerForce;
+        fy += (targetCenter.y - node.y) * centerForce;
 
         // Update velocity with dampening
         node.vx = (node.vx + fx) * dampening;
@@ -196,22 +342,8 @@ export default function WordWebPage() {
         node.x += node.vx;
         node.y += node.vy;
 
-        // Soft boundary constraints (bounce back smoothly)
-        const margin = 60;
-        if (node.x < margin) {
-          node.x = margin;
-          node.vx *= -0.5;
-        } else if (node.x > dimensions.width - margin) {
-          node.x = dimensions.width - margin;
-          node.vx *= -0.5;
-        }
-        if (node.y < margin) {
-          node.y = margin;
-          node.vy *= -0.5;
-        } else if (node.y > dimensions.height - margin) {
-          node.y = dimensions.height - margin;
-          node.vy *= -0.5;
-        }
+        // No boundary constraints - let nodes spread freely off-screen
+        // Users can pan and zoom to explore the full web
       }
 
       nodesRef.current = updatedNodes;
@@ -221,7 +353,7 @@ export default function WordWebPage() {
 
     simulate();
     return () => cancelAnimationFrame(animationId);
-  }, [nodes.length, edges, dimensions]);
+  }, [nodes.length, edges, dimensions, findConnectedComponents]);
 
   // Draw canvas
   useEffect(() => {
@@ -339,9 +471,9 @@ export default function WordWebPage() {
       draggedNode.current = node;
     } else {
       isDragging.current = true;
-      dragStart.current = { x: e.clientX - offset.x, y: e.clientY - offset.y };
+      dragStart.current = { x: e.clientX - targetOffset.current.x, y: e.clientY - targetOffset.current.y };
     }
-  }, [getNodeAtPosition, offset]);
+  }, [getNodeAtPosition]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (draggedNode.current) {
@@ -357,10 +489,13 @@ export default function WordWebPage() {
           : n
       ));
     } else if (isDragging.current) {
-      setOffset({
+      const newOffset = {
         x: e.clientX - dragStart.current.x,
         y: e.clientY - dragStart.current.y,
-      });
+      };
+      targetOffset.current = newOffset;
+      currentOffsetRef.current = newOffset; // Keep in sync for responsive panning
+      setOffset(newOffset);
     } else {
       const node = getNodeAtPosition(e.clientX, e.clientY);
       setHoveredNode(node);
@@ -383,8 +518,28 @@ export default function WordWebPage() {
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    setScale((prev) => Math.min(3, Math.max(0.3, prev * delta)));
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    // Smoother zoom factor
+    const zoomFactor = e.deltaY > 0 ? 0.92 : 1.08;
+    const currentScale = targetScale.current;
+    const newScale = Math.min(3, Math.max(0.3, currentScale * zoomFactor));
+
+    // Calculate offset adjustment to zoom toward mouse position
+    // The point under the mouse should stay fixed
+    const currentOffset = targetOffset.current;
+    const newOffset = {
+      x: mouseX - (mouseX - currentOffset.x) * (newScale / currentScale),
+      y: mouseY - (mouseY - currentOffset.y) * (newScale / currentScale),
+    };
+
+    targetScale.current = newScale;
+    targetOffset.current = newOffset;
   }, []);
 
   // Get connected words for selected node

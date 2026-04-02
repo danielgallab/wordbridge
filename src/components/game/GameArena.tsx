@@ -25,8 +25,10 @@ export function GameArena() {
     error,
     isValidating,
     players,
+    isHost,
     submitWord,
     requestRematch,
+    startGame,
     reset,
   } = useGameStore();
 
@@ -115,28 +117,90 @@ export function GameArena() {
     );
   }
 
-  // Waiting for opponent
+  // Waiting for players / lobby
   if (isWaiting) {
+    const canStart = players.length >= 2;
+    // Sort players by created_at to ensure host (first player) is always first
+    const sortedPlayers = [...players].sort(
+      (a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
+    );
+
     return (
       <div className="w-full max-w-md mx-auto text-center px-2">
         <div className="bg-[var(--surface)] border-2 border-[var(--border)] rounded-lg p-4 sm:p-8">
-          <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4">Waiting for opponent...</h2>
+          <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4">
+            {isHost ? 'Waiting for players...' : 'Waiting for host to start...'}
+          </h2>
+
+          {/* Room code */}
           <div className="mb-4 sm:mb-6">
             <p className="text-sm sm:text-base text-[var(--text-muted)] mb-2">Share this code:</p>
             <div className="text-3xl sm:text-4xl font-mono font-bold tracking-widest text-[var(--present)]">
               {room.code}
             </div>
           </div>
-          <div className="flex gap-1 justify-center mb-4 sm:mb-6">
-            <span className="w-2 h-2 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: '0ms' }} />
-            <span className="w-2 h-2 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: '150ms' }} />
-            <span className="w-2 h-2 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: '300ms' }} />
+
+          {/* Player list */}
+          <div className="mb-4 sm:mb-6">
+            <p className="text-xs uppercase text-[var(--text-muted)] mb-2 font-bold">
+              Players ({sortedPlayers.length}/8)
+            </p>
+            <div className="space-y-2">
+              {sortedPlayers.map((player, index) => (
+                <div
+                  key={player.id}
+                  className={`px-3 py-2 rounded-md border ${
+                    player.id === playerId
+                      ? 'border-[var(--present)] bg-[var(--present)]/10'
+                      : 'border-[var(--border)] bg-[var(--background)]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">{player.player_name}</span>
+                    <div className="flex items-center gap-2">
+                      {player.id === playerId && (
+                        <span className="text-xs px-2 py-0.5 rounded bg-[var(--present)] text-white font-bold">
+                          YOU
+                        </span>
+                      )}
+                      {index === 0 && (
+                        <span className="text-xs px-2 py-0.5 rounded bg-[var(--correct)] text-white font-bold">
+                          HOST
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
+
+          {/* Waiting animation or Start button */}
+          {isHost ? (
+            <button
+              onClick={startGame}
+              disabled={!canStart}
+              className={`w-full py-3 rounded-md font-bold transition-opacity mb-3 ${
+                canStart
+                  ? 'bg-[var(--correct)] text-white hover:opacity-90'
+                  : 'bg-[var(--border)] text-[var(--text-muted)] cursor-not-allowed'
+              }`}
+            >
+              {canStart ? 'Start Game' : 'Need at least 2 players'}
+            </button>
+          ) : (
+            <div className="flex gap-1 justify-center mb-4 sm:mb-6">
+              <span className="w-2 h-2 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: '0ms' }} />
+              <span className="w-2 h-2 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: '150ms' }} />
+              <span className="w-2 h-2 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+          )}
+
           <button
             onClick={handleGoHome}
             className="text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
           >
-            Cancel
+            Leave Room
           </button>
         </div>
       </div>

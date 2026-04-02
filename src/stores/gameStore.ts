@@ -29,6 +29,7 @@ interface Player {
   chain: string[];
   is_winner: boolean;
   wants_rematch?: boolean;
+  created_at?: string;
 }
 
 interface Room {
@@ -40,6 +41,7 @@ interface Room {
   time_limit: number;
   difficulty?: 'easy' | 'medium' | 'hard';
   winner_id: string | null;
+  started_at?: string | null;
 }
 
 // Rematch status - only tracks the rematch negotiation flow
@@ -56,12 +58,14 @@ interface GameState {
   playerId: string | null;
   playerName: string;
   players: Player[];
+  isHost: boolean;
 
   // Game state
   myChain: string[];
   opponentChainLength: number; // Only track length during play
   opponentChain: string[]; // Full chain revealed at game end
   timeLeft: number;
+  gameStartedAt: string | null; // Server timestamp for synchronized timer
   rematchStatus: RematchStatus;
   localGameEnded: boolean; // Tracks if we've locally ended the game (before server confirms)
   winner: 'me' | 'opponent' | 'draw' | null;
@@ -81,6 +85,8 @@ interface GameState {
   requestRematch: () => Promise<void>;
   setOpponentWantsRematch: (wants: boolean) => void;
   resetForRematch: (startWord: string) => void;
+  startGame: () => Promise<boolean>;
+  setGameStartedAt: (startedAt: string) => void;
   reset: () => void;
 }
 
@@ -89,10 +95,12 @@ export const useGameStore = create<GameState>((set, get) => ({
   playerId: null,
   playerName: '',
   players: [],
+  isHost: false,
   myChain: [],
   opponentChainLength: 1,
   opponentChain: [],
   timeLeft: TOTAL_TIME,
+  gameStartedAt: null,
   rematchStatus: 'none',
   localGameEnded: false,
   winner: null,
@@ -181,15 +189,30 @@ export const useGameStore = create<GameState>((set, get) => ({
     const opponent = players.find(p => p.id !== playerId);
     const gameFinished = room.status === 'finished';
 
+    // Determine if current player is host (first player by created_at)
+    const sortedPlayers = [...players].sort(
+      (a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime()
+    );
+    const isHost = sortedPlayers[0]?.id === playerId;
+
+    // Calculate time remaining based on server start time if game is playing
+    let timeLeft = room.time_limit || TOTAL_TIME;
+    if (room.status === 'playing' && room.started_at) {
+      const elapsedSeconds = Math.floor((Date.now() - new Date(room.started_at).getTime()) / 1000);
+      timeLeft = Math.max(0, (room.time_limit || TOTAL_TIME) - elapsedSeconds);
+    }
+
     set({
       room,
       playerId,
       players,
+      isHost,
       myChain: me?.chain || [room.start_word],
       opponentChainLength: opponent?.chain?.length || 1,
       // Only reveal full opponent chain if game is already finished
       opponentChain: gameFinished ? (opponent?.chain || [room.start_word]) : [],
-      timeLeft: room.time_limit || TOTAL_TIME,
+      timeLeft,
+      gameStartedAt: room.started_at || null,
       rematchStatus: 'none',
       localGameEnded: gameFinished,
       winner: null,
@@ -431,15 +454,63 @@ export const useGameStore = create<GameState>((set, get) => ({
     }, 1000);
   },
 
+  startGame: async () => {
+    const state = get();
+    if (!state.room || !state.playerId || !state.isHost) {
+      return false;
+    }
+
+    try {
+      const response = await fetch('/api/rooms/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roomId: state.room.id,
+          playerId: state.playerId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        set({ error: data.error || 'Failed to start game' });
+        setTimeout(() => set({ error: null }), 2500);
+        return false;
+      }
+
+      // Game started successfully - the room update will come via realtime
+      set({ gameStartedAt: data.started_at });
+      return true;
+    } catch {
+      set({ error: 'Network error. Please try again.' });
+      setTimeout(() => set({ error: null }), 2500);
+      return false;
+    }
+  },
+
+  setGameStartedAt: (startedAt: string) => {
+    const state = get();
+    const timeLimit = state.room?.time_limit || TOTAL_TIME;
+    const elapsedSeconds = Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000);
+    const remainingTime = Math.max(0, timeLimit - elapsedSeconds);
+
+    set({
+      gameStartedAt: startedAt,
+      timeLeft: remainingTime,
+    });
+  },
+
   reset: () => set({
     room: null,
     playerId: null,
     playerName: '',
     players: [],
+    isHost: false,
     myChain: [],
     opponentChainLength: 1,
     opponentChain: [],
     timeLeft: TOTAL_TIME,
+    gameStartedAt: null,
     rematchStatus: 'none',
     localGameEnded: false,
     winner: null,

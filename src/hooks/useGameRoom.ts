@@ -22,6 +22,7 @@ export function useGameRoom(roomId: string | null) {
     tick,
     setOpponentWantsRematch,
     resetForRematch,
+    setGameStartedAt,
   } = useGameStore();
 
   // Subscribe to room changes
@@ -120,6 +121,7 @@ export function useGameRoom(roomId: string | null) {
             target_word: string;
             time_limit: number;
             winner_id: string | null;
+            started_at: string | null;
           };
 
           console.log('[useGameRoom] rooms realtime event', {
@@ -129,8 +131,18 @@ export function useGameRoom(roomId: string | null) {
             newStartWord: updated.start_word,
             prevWinnerId: prevRoom?.winner_id,
             newWinnerId: updated.winner_id,
+            startedAt: updated.started_at,
             rematchStatus: currentRematchStatus,
           });
+
+          // Handle game start - sync timer with server timestamp
+          const isGameStarting = updated.status === 'playing' && prevRoom?.status === 'waiting';
+          if (isGameStarting && updated.started_at) {
+            console.log('[useGameRoom] Game starting - syncing timer with server timestamp', {
+              startedAt: updated.started_at,
+            });
+            setGameStartedAt(updated.started_at);
+          }
 
           // Handle rematch - detect when a new game starts
           // This can happen in two ways:
@@ -150,6 +162,10 @@ export function useGameRoom(roomId: string | null) {
               newStartWord: updated.start_word,
             });
             resetForRematch(updated.start_word);
+            // Sync timer for rematch as well
+            if (updated.started_at) {
+              setGameStartedAt(updated.started_at);
+            }
             // Also refetch players to get their reset state
             fetchPlayers();
           }
@@ -214,7 +230,7 @@ export function useGameRoom(roomId: string | null) {
         supabase.removeChannel(channelRef.current);
       }
     };
-  }, [roomId, setRoom, setPlayers, updatePlayer, endGame, setOpponentWantsRematch, resetForRematch]);
+  }, [roomId, setRoom, setPlayers, updatePlayer, endGame, setOpponentWantsRematch, resetForRematch, setGameStartedAt]);
 
   // Game timer - runs when room.status is 'playing' and not in rematch transition
   useEffect(() => {
