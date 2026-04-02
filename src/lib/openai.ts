@@ -15,6 +15,25 @@ export function getOpenAI(): OpenAI {
   return _openai;
 }
 
+export const WORD_PAIR_GENERATION_PROMPT = `You are a word pair generator for a word association game called WordBridge.
+
+Generate a START word and TARGET word that players must connect through a chain of associated words.
+
+DIFFICULTY LEVELS:
+- "easy": Words that are loosely related (2-3 word chain expected). Example: book → library (book→read→library)
+- "medium": Words from different but connectable domains (4-5 word chain). Example: ocean → guitar (ocean→wave→sound→music→guitar)
+- "hard": Seemingly unrelated words requiring creative thinking (6+ word chain). Example: banana → NASA (banana→yellow→sun→space→NASA)
+
+RULES:
+1. Both words must be common English nouns (no proper nouns, no obscure words)
+2. Words should be single words (no phrases)
+3. The connection should be possible but not obvious
+4. Avoid words that are direct synonyms, antonyms, or have immediate associations
+5. For harder difficulties, choose words from very different semantic domains
+6. Do not pick words similar to the examples provided above
+
+Generate a unique and creative word pair. Surprise the player with unexpected words.`;
+
 export const WORD_VALIDATION_PROMPT = `You are a STRICT word association validator for a word chain game. Your job is to REJECT weak connections.
 
 STEP 1 - WORD VALIDITY:

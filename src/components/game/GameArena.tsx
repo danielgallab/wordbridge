@@ -19,23 +19,27 @@ export function GameArena() {
     opponentChain,
     opponentChainLength,
     timeLeft,
-    isGameOver,
+    rematchStatus,
     winner,
     error,
     isValidating,
     players,
-    wantsRematch,
-    opponentWantsRematch,
     submitWord,
     requestRematch,
     reset,
   } = useGameStore();
 
-  const { opponent, isWaiting, isPlaying } = useGameRoom(room?.id || null);
+  const { opponent, isWaiting, isPlaying, isFinished } = useGameRoom(room?.id || null);
 
   const myPlayer = players.find(p => p.id === playerId);
   const myName = myPlayer?.player_name || 'You';
   const opponentName = opponent?.player_name || 'Opponent';
+
+  // Derive rematch state from rematchStatus
+  const wantsRematch = rematchStatus === 'requested';
+  const opponentWantsRematch = rematchStatus === 'pending';
+  const isRematchStarting = rematchStatus === 'starting';
+  const showGameOver = isFinished && rematchStatus !== 'starting';
 
   const handleSubmitWord = useCallback(
     async (word: string) => {
@@ -60,16 +64,16 @@ export function GameArena() {
   // Waiting for opponent
   if (isWaiting) {
     return (
-      <div className="w-full max-w-md mx-auto text-center">
-        <div className="bg-[var(--surface)] border-2 border-[var(--border)] rounded-lg p-8">
-          <h2 className="text-xl font-bold mb-4">Waiting for opponent...</h2>
-          <div className="mb-6">
-            <p className="text-[var(--text-muted)] mb-2">Share this code:</p>
-            <div className="text-4xl font-mono font-bold tracking-widest text-[var(--present)]">
+      <div className="w-full max-w-md mx-auto text-center px-2">
+        <div className="bg-[var(--surface)] border-2 border-[var(--border)] rounded-lg p-4 sm:p-8">
+          <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4">Waiting for opponent...</h2>
+          <div className="mb-4 sm:mb-6">
+            <p className="text-sm sm:text-base text-[var(--text-muted)] mb-2">Share this code:</p>
+            <div className="text-3xl sm:text-4xl font-mono font-bold tracking-widest text-[var(--present)]">
               {room.code}
             </div>
           </div>
-          <div className="flex gap-1 justify-center mb-6">
+          <div className="flex gap-1 justify-center mb-4 sm:mb-6">
             <span className="w-2 h-2 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: '0ms' }} />
             <span className="w-2 h-2 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: '150ms' }} />
             <span className="w-2 h-2 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: '300ms' }} />
@@ -88,17 +92,17 @@ export function GameArena() {
   return (
     <div className="w-full max-w-3xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4 sm:mb-6">
         <div className="text-center flex-1">
-          <div className="text-sm text-[var(--text-muted)] uppercase tracking-wider mb-1">
+          <div className="text-xs sm:text-sm text-[var(--text-muted)] uppercase tracking-wider mb-1">
             Connect
           </div>
-          <div className="flex items-center justify-center gap-2">
-            <span className="font-mono font-bold text-[var(--present)] uppercase">
+          <div className="flex items-center justify-center gap-1 sm:gap-2 flex-wrap">
+            <span className="font-mono font-bold text-sm sm:text-base text-[var(--present)] uppercase">
               {room.start_word}
             </span>
             <span className="text-[var(--text-muted)]">→</span>
-            <span className="font-mono font-bold text-[var(--correct)] uppercase">
+            <span className="font-mono font-bold text-sm sm:text-base text-[var(--correct)] uppercase">
               {room.target_word}
             </span>
           </div>
@@ -106,26 +110,26 @@ export function GameArena() {
       </div>
 
       {/* Timer */}
-      <div className="flex justify-center mb-6">
+      <div className="flex justify-center mb-4 sm:mb-6">
         <Timer timeLeft={timeLeft} totalTime={room.time_limit || TOTAL_TIME} />
       </div>
 
       {/* Arena */}
-      <div className="grid grid-cols-2 gap-4 relative">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative">
         <PlayerPanel
           name={myName}
           chain={myChain}
           targetWord={room.target_word}
           isYou
           isWinner={winner === 'me'}
-          showInput={isPlaying && !isGameOver}
+          showInput={isPlaying}
           onSubmitWord={handleSubmitWord}
           isValidating={isValidating}
           error={error}
         />
 
-        {/* VS Divider */}
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
+        {/* VS Divider - hidden on mobile since panels stack */}
+        <div className="hidden md:block absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
           <div className="w-10 h-10 rounded-full bg-[var(--background)] border-2 border-[var(--border)] flex items-center justify-center font-bold text-[var(--text-muted)]">
             VS
           </div>
@@ -137,19 +141,19 @@ export function GameArena() {
           targetWord={room.target_word}
           isWinner={winner === 'opponent'}
           chainLength={opponentChainLength}
-          showChainLengthOnly={!isGameOver}
+          showChainLengthOnly={!isFinished}
         />
       </div>
 
       {/* Game Over Overlay */}
-      {isGameOver && (
+      {showGameOver && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-          <div className="bg-[var(--background)] border-2 border-[var(--border)] rounded-xl p-8 text-center max-w-sm w-full mx-4">
-            <div className="text-5xl mb-4">
+          <div className="bg-[var(--background)] border-2 border-[var(--border)] rounded-xl p-4 sm:p-8 text-center max-w-sm w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="text-4xl sm:text-5xl mb-3 sm:mb-4">
               {winner === 'me' ? '🏆' : winner === 'opponent' ? '💀' : '🤝'}
             </div>
             <h2
-              className={`text-2xl font-bold mb-2 ${
+              className={`text-xl sm:text-2xl font-bold mb-2 ${
                 winner === 'me'
                   ? 'text-[var(--correct)]'
                   : winner === 'opponent'
@@ -159,7 +163,7 @@ export function GameArena() {
             >
               {winner === 'me' ? 'You Win!' : winner === 'opponent' ? `${opponentName} Wins` : 'Draw!'}
             </h2>
-            <p className="text-[var(--text-muted)] mb-4">
+            <p className="text-sm sm:text-base text-[var(--text-muted)] mb-3 sm:mb-4">
               {winner === 'me'
                 ? `Your chain: ${myChain.length - 1} steps`
                 : winner === 'opponent'
@@ -168,30 +172,30 @@ export function GameArena() {
             </p>
 
             {myChain.length > 1 && (
-              <div className="bg-[var(--surface)] rounded-lg p-3 mb-4 text-left">
+              <div className="bg-[var(--surface)] rounded-lg p-2 sm:p-3 mb-3 sm:mb-4 text-left">
                 <div className="text-xs uppercase text-[var(--text-muted)] mb-1 font-bold">
                   Your chain
                 </div>
-                <div className="font-mono text-sm text-[var(--present)]">
+                <div className="font-mono text-xs sm:text-sm text-[var(--present)] break-words">
                   {myChain.join(' → ')}
                 </div>
               </div>
             )}
 
             {opponentChain.length > 1 && (
-              <div className="bg-[var(--surface)] rounded-lg p-3 mb-4 text-left">
+              <div className="bg-[var(--surface)] rounded-lg p-2 sm:p-3 mb-3 sm:mb-4 text-left">
                 <div className="text-xs uppercase text-[var(--text-muted)] mb-1 font-bold">
                   {opponentName}&apos;s chain
                 </div>
-                <div className="font-mono text-sm text-[var(--text-muted)]">
+                <div className="font-mono text-xs sm:text-sm text-[var(--text-muted)] break-words">
                   {opponentChain.join(' → ')}
                 </div>
               </div>
             )}
 
-            {wantsRematch ? (
+            {wantsRematch || isRematchStarting ? (
               <div className="w-full py-3 rounded-md bg-[var(--surface)] border border-[var(--border)] text-[var(--text)] font-bold mb-3 flex items-center justify-center gap-2">
-                {opponentWantsRematch ? (
+                {isRematchStarting ? (
                   <>Starting rematch...</>
                 ) : (
                   <>

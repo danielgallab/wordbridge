@@ -79,17 +79,17 @@ export default function PlayPage() {
   }
 
   return (
-    <main className="flex-1 flex flex-col p-4">
+    <main className="flex-1 flex flex-col p-2 sm:p-4">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6 max-w-3xl mx-auto w-full">
+      <div className="flex items-center justify-between mb-4 sm:mb-6 max-w-3xl mx-auto w-full">
         <Link
           href="/"
-          className="text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
+          className="text-sm sm:text-base text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
         >
-          &larr; Leave
+          &larr; <span className="hidden sm:inline">Leave</span>
         </Link>
-        <h1 className="text-xl font-bold tracking-tight">WORDBRIDGE</h1>
-        <div className="text-sm font-mono text-[var(--text-muted)]">
+        <h1 className="text-lg sm:text-xl font-bold tracking-tight">WORDBRIDGE</h1>
+        <div className="text-xs sm:text-sm font-mono text-[var(--text-muted)]">
           {code.toUpperCase()}
         </div>
       </div>

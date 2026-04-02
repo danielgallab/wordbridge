@@ -36,7 +36,7 @@ export function PlayerPanel({
   return (
     <div
       className={`
-        p-4 rounded-lg border-2
+        p-3 sm:p-4 rounded-lg border-2
         ${isWinner ? 'border-[var(--correct)] bg-[var(--correct)]/5' : 'border-[var(--border)]'}
         ${isYou ? 'border-[var(--present)]' : ''}
       `}
@@ -61,13 +61,13 @@ export function PlayerPanel({
         </div>
       </div>
 
-      <div className="min-h-[180px] mb-3">
+      <div className="min-h-[120px] sm:min-h-[180px] mb-3">
         {showChainLengthOnly ? (
-          <div className="flex flex-col items-center justify-center h-[180px] text-center">
-            <div className="text-6xl font-bold text-[var(--text-muted)] mb-2">
+          <div className="flex flex-col items-center justify-center h-[120px] sm:h-[180px] text-center">
+            <div className="text-4xl sm:text-6xl font-bold text-[var(--text-muted)] mb-2">
               {displayLength - 1}
             </div>
-            <div className="text-sm text-[var(--text-muted)] uppercase tracking-wider">
+            <div className="text-xs sm:text-sm text-[var(--text-muted)] uppercase tracking-wider">
               {displayLength - 1 === 1 ? 'word' : 'words'}
             </div>
           </div>

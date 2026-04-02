@@ -1,27 +1,11 @@
 -- WordBridge Database Schema
 -- Run this in your Supabase SQL Editor
 
--- Word pairs for game rounds (no more hardcoding!)
-CREATE TABLE IF NOT EXISTS word_pairs (
-  id SERIAL PRIMARY KEY,
-  start_word TEXT NOT NULL,
-  target_word TEXT NOT NULL,
-  difficulty TEXT DEFAULT 'medium', -- easy, medium, hard
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+-- Word pairs table is no longer needed for game logic
+-- Word pairs are now generated on-demand using AI (OpenAI)
+-- This table can be kept for logging/analytics purposes if desired
 
--- Insert some initial word pairs
-INSERT INTO word_pairs (start_word, target_word, difficulty) VALUES
-  ('banana', 'NASA', 'medium'),
-  ('ocean', 'guitar', 'medium'),
-  ('fire', 'library', 'medium'),
-  ('dog', 'mathematics', 'hard'),
-  ('rain', 'skyscraper', 'medium'),
-  ('coffee', 'airplane', 'medium'),
-  ('tree', 'computer', 'medium'),
-  ('moon', 'pizza', 'hard'),
-  ('book', 'mountain', 'easy'),
-  ('sun', 'music', 'easy');
+-- DROP TABLE IF EXISTS word_pairs;
 
 -- Game rooms for multiplayer
 CREATE TABLE IF NOT EXISTS rooms (
@@ -74,11 +58,11 @@ ALTER PUBLICATION supabase_realtime ADD TABLE room_players;
 -- Row Level Security (RLS)
 ALTER TABLE rooms ENABLE ROW LEVEL SECURITY;
 ALTER TABLE room_players ENABLE ROW LEVEL SECURITY;
-ALTER TABLE word_pairs ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE word_pairs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE word_associations ENABLE ROW LEVEL SECURITY;
 
 -- Allow public read/write for game tables (no auth required for MVP)
 CREATE POLICY "Allow all for rooms" ON rooms FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all for room_players" ON room_players FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow read for word_pairs" ON word_pairs FOR SELECT USING (true);
+-- CREATE POLICY "Allow all for word_pairs" ON word_pairs FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all for word_associations" ON word_associations FOR ALL USING (true) WITH CHECK (true);

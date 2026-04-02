@@ -100,15 +100,15 @@ export default function Home() {
     <main className="flex-1 flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-sm">
         {/* Logo */}
-        <h1 className="text-4xl font-bold text-center mb-2 tracking-tight">
+        <h1 className="text-3xl sm:text-4xl font-bold text-center mb-2 tracking-tight">
           WORDBRIDGE
         </h1>
-        <p className="text-center text-[var(--text-muted)] text-sm mb-8">
+        <p className="text-center text-[var(--text-muted)] text-xs sm:text-sm mb-6 sm:mb-8">
           Connect words in the shortest chain
         </p>
 
         {/* Card */}
-        <div className="bg-[var(--surface)] border-2 border-[var(--border)] rounded-lg p-6">
+        <div className="bg-[var(--surface)] border-2 border-[var(--border)] rounded-lg p-4 sm:p-6">
           {/* Name input */}
           <label className="block text-xs uppercase tracking-wider text-[var(--text-muted)] font-bold mb-2">
             Your Name

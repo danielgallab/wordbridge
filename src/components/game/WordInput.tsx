@@ -48,7 +48,7 @@ export function WordInput({ onSubmit, disabled, isValidating, error }: WordInput
           autoComplete="off"
           autoCapitalize="none"
           className={`
-            flex-1 px-4 py-3 rounded-md
+            flex-1 px-3 sm:px-4 py-2.5 sm:py-3 rounded-md text-base
             bg-[var(--surface)] border-2 border-[var(--border)]
             text-[var(--text)] font-mono uppercase
             placeholder:text-[var(--text-muted)] placeholder:normal-case
@@ -61,7 +61,7 @@ export function WordInput({ onSubmit, disabled, isValidating, error }: WordInput
           onClick={handleSubmit}
           disabled={disabled || isValidating || !value.trim()}
           className={`
-            px-6 py-3 rounded-md font-bold
+            px-4 sm:px-6 py-2.5 sm:py-3 rounded-md font-bold
             bg-[var(--correct)] text-white
             hover:opacity-90 transition-opacity
             disabled:opacity-30 disabled:cursor-not-allowed

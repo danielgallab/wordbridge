@@ -12,13 +12,13 @@ export function Timer({ timeLeft, totalTime }: TimerProps) {
   return (
     <div className="flex flex-col items-center gap-2">
       <div
-        className={`text-4xl font-bold tabular-nums ${
+        className={`text-2xl sm:text-4xl font-bold tabular-nums ${
           isUrgent ? 'text-[var(--error)] animate-pulse' : 'text-[var(--text)]'
         }`}
       >
         {timeLeft}s
       </div>
-      <div className="w-32 h-1.5 bg-[var(--border)] rounded-full overflow-hidden">
+      <div className="w-24 sm:w-32 h-1.5 bg-[var(--border)] rounded-full overflow-hidden">
         <div
           className={`h-full rounded-full transition-all duration-1000 ${
             isUrgent ? 'bg-[var(--error)]' : 'bg-[var(--correct)]'

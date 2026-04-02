@@ -20,7 +20,7 @@ export function ChainDisplay({ chain, targetWord, isPlayer = false, isValidating
           <div
             key={`${word}-${index}`}
             className={`
-              px-3 py-2 rounded-md font-bold uppercase text-sm
+              px-2 sm:px-3 py-1.5 sm:py-2 rounded-md font-bold uppercase text-xs sm:text-sm
               flex items-center justify-between
               ${isStart ? 'bg-[var(--present)] text-white' : ''}
               ${isTarget ? 'bg-[var(--correct)] text-white' : ''}
