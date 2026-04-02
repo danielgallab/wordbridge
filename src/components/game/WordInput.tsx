@@ -14,16 +14,18 @@ export function WordInput({ onSubmit, disabled, isValidating, error }: WordInput
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!disabled) {
+    if (!disabled && !isValidating) {
       inputRef.current?.focus();
     }
-  }, [disabled]);
+  }, [disabled, isValidating]);
 
   const handleSubmit = () => {
     const trimmed = value.trim().toLowerCase();
     if (trimmed && !disabled && !isValidating) {
       onSubmit(trimmed);
       setValue('');
+      // Refocus input after submission      
+      inputRef.current?.focus();
     }
   };
 
@@ -47,6 +49,7 @@ export function WordInput({ onSubmit, disabled, isValidating, error }: WordInput
           maxLength={20}
           autoComplete="off"
           autoCapitalize="none"
+          autoFocus
           className={`
             flex-1 px-3 sm:px-4 py-2.5 sm:py-3 rounded-md text-base
             bg-[var(--surface)] border-2 border-[var(--border)]

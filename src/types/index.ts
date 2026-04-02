@@ -57,11 +57,34 @@ export interface GameState {
   isValidating: boolean;
 }
 
-export interface DailyChallenge {
+export interface DailyPuzzle {
   id: number;
-  date: string;
+  puzzle_date: string;
   start_word: string;
   target_word: string;
+  difficulty: Difficulty;
+  created_at: string;
+}
+
+export interface DailyCompletion {
+  chain: string[];
+  wordCount: number;
+  completedAt: string;
+}
+
+export interface PlayerStats {
+  currentStreak: number;
+  maxStreak: number;
+  totalCompletions: number;
+  bestWordCount: number | null;
+  averageWordCount: number | null;
+}
+
+export interface LeaderboardEntry {
+  rank: number;
+  playerName: string;
+  wordCount: number;
+  completedAt: string;
 }
 
 export type ValidationResult = {
