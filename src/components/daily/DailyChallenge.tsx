@@ -1,14 +1,20 @@
 'use client';
 
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { useDailyStore } from '@/stores/dailyStore';
-import { getSessionId } from '@/lib/sessionId';
+import { ensureSessionId } from '@/lib/sessionId';
 import { WordInput } from '@/components/game/WordInput';
 import { ChainDisplay } from '@/components/game/ChainDisplay';
 import { DailyCompletionModal } from './DailyCompletionModal';
 import { calculatePathQuality } from '@/lib/scoring';
+import type { DailyData } from '@/lib/daily.server';
 
-export function DailyChallenge() {
+interface DailyChallengeProps {
+  initialData: DailyData | null;
+}
+
+export function DailyChallenge({ initialData }: DailyChallengeProps) {
+  const initialized = useRef(false);
   const {
     puzzle,
     chain,
@@ -19,18 +25,23 @@ export function DailyChallenge() {
     isValidating,
     error,
     sessionId,
-    setSessionId,
-    loadPuzzle,
+    initializeWithData,
     submitWord,
     startPracticeMode,
   } = useDailyStore();
 
-  // Initialize session and load puzzle
+  // Initialize store with SSR data on mount
   useEffect(() => {
-    const sid = getSessionId();
-    setSessionId(sid);
-    loadPuzzle();
-  }, [setSessionId, loadPuzzle]);
+    if (initialized.current) return;
+    initialized.current = true;
+
+    // Ensure session cookie exists (creates one if new user)
+    const sid = ensureSessionId();
+
+    if (initialData) {
+      initializeWithData(initialData, sid);
+    }
+  }, [initialData, initializeWithData]);
 
   const handleSubmitWord = useCallback(
     async (word: string) => {

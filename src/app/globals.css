@@ -112,3 +112,17 @@ body {
 .animate-arrow-appear {
   animation: arrow-appear 0.2s ease-out;
 }
+
+@keyframes pulse-pending {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.01);
+  }
+}
+
+.animate-pulse-pending {
+  animation: pulse-pending 1s ease-in-out infinite;
+}

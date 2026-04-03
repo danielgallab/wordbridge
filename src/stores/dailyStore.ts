@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { DailyPuzzle, DailyCompletion, PlayerStats, LeaderboardEntry } from '@/types';
+import type { DailyData } from '@/lib/daily.server';
 
 export type RejectionReason =
   | 'not_related'
@@ -47,6 +48,7 @@ interface DailyState {
   sessionId: string;
 
   // Actions
+  initializeWithData: (data: DailyData, sessionId: string) => void;
   setSessionId: (sessionId: string) => void;
   loadPuzzle: () => Promise<void>;
   loadStatus: () => Promise<void>;
@@ -73,27 +75,58 @@ export const useDailyStore = create<DailyState>((set, get) => ({
 
   setSessionId: (sessionId) => set({ sessionId }),
 
+  initializeWithData: (data, sessionId) => {
+    set({
+      puzzle: data.puzzle,
+      chain: data.hasCompletedToday && data.completion
+        ? data.completion.chain
+        : [data.puzzle.start_word],
+      isComplete: data.hasCompletedToday,
+      hasCompletedToday: data.hasCompletedToday,
+      previousCompletion: data.completion,
+      stats: data.stats,
+      sessionId,
+      isLoading: false,
+    });
+  },
+
   loadPuzzle: async () => {
+    const { sessionId } = get();
     set({ isLoading: true, error: null });
 
     try {
-      const response = await fetch('/api/daily/puzzle');
-      const data = await response.json();
+      // Fetch puzzle and status in parallel
+      const [puzzleResponse, statusResponse] = await Promise.all([
+        fetch('/api/daily/puzzle'),
+        sessionId ? fetch(`/api/daily/status?sessionId=${sessionId}`) : Promise.resolve(null),
+      ]);
 
-      if (!response.ok) {
-        set({ error: data.error || 'Failed to load puzzle', isLoading: false });
+      const puzzleData = await puzzleResponse.json();
+
+      if (!puzzleResponse.ok) {
+        set({ error: puzzleData.error || 'Failed to load puzzle', isLoading: false });
         return;
       }
 
-      const puzzle = data.puzzle as DailyPuzzle;
+      const puzzle = puzzleData.puzzle as DailyPuzzle;
+
+      // Process status response if available
+      let statusData = null;
+      if (statusResponse && statusResponse.ok) {
+        statusData = await statusResponse.json();
+      }
+
       set({
         puzzle,
-        chain: [puzzle.start_word],
+        chain: statusData?.hasCompleted && statusData?.completion
+          ? statusData.completion.chain
+          : [puzzle.start_word],
         isLoading: false,
+        hasCompletedToday: statusData?.hasCompleted ?? false,
+        previousCompletion: statusData?.completion ?? null,
+        stats: statusData?.stats ?? null,
+        isComplete: statusData?.hasCompleted ?? false,
       });
-
-      // Load status after puzzle is loaded
-      await get().loadStatus();
     } catch {
       set({ error: 'Network error. Please try again.', isLoading: false });
     }
@@ -101,12 +134,14 @@ export const useDailyStore = create<DailyState>((set, get) => ({
 
   loadStatus: async () => {
     const { puzzle, sessionId } = get();
-    if (!puzzle || !sessionId) return;
+    if (!sessionId) return;
 
     try {
-      const response = await fetch(
-        `/api/daily/status?sessionId=${sessionId}&puzzleId=${puzzle.id}`
-      );
+      // puzzleId is optional - API will use today's puzzle if not provided
+      const url = puzzle
+        ? `/api/daily/status?sessionId=${sessionId}&puzzleId=${puzzle.id}`
+        : `/api/daily/status?sessionId=${sessionId}`;
+      const response = await fetch(url);
       const data = await response.json();
 
       if (response.ok) {

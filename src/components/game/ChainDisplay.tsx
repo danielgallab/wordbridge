@@ -89,7 +89,7 @@ export function ChainDisplay({ chain, targetWord, isPlayer = false, isValidating
                 ${isStart ? 'bg-[var(--present)] text-white' : ''}
                 ${isTarget ? 'bg-[var(--correct)] text-white' : ''}
                 ${!isStart && !isTarget ? 'bg-[var(--surface)] border border-[var(--border)]' : ''}
-                ${isPending ? 'opacity-60 animate-pulse' : ''}
+                ${isPending ? 'opacity-60 animate-pulse-pending' : ''}
               `}
               style={{
                 animation: isLastWord && !isPending ? 'pop 0.15s ease' : undefined,

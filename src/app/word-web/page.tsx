@@ -36,6 +36,9 @@ export default function WordWebPage() {
   const [searchResults, setSearchResults] = useState<Node[]>([]);
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Debug filter: minimum connections to render a node
+  const [minConnections, setMinConnections] = useState(0);
   const [dimensions, setDimensions] = useState(() => ({
     width: typeof window !== 'undefined' ? window.innerWidth : 800,
     height: typeof window !== 'undefined' ? window.innerHeight - 120 : 600, // Account for header/stats
@@ -347,6 +350,8 @@ export default function WordWebPage() {
         }
 
         // Attraction along edges (use nodeMap for current positions)
+        // Uses spring force toward ideal distance for stability
+        const idealEdgeLength = 150;
         for (const edge of edges) {
           let other: Node | undefined;
           if (edge.source === node.id) {
@@ -357,12 +362,12 @@ export default function WordWebPage() {
           if (other) {
             const dx = other.x - node.x;
             const dy = other.y - node.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            // Only apply attraction if nodes are far apart enough
-            if (dist > minDistance) {
-              fx += dx * attraction;
-              fy += dy * attraction;
-            }
+            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+            // Spring force: pull toward ideal distance (positive if too far, negative if too close)
+            const displacement = dist - idealEdgeLength;
+            const springForce = displacement * attraction;
+            fx += (dx / dist) * springForce;
+            fy += (dy / dist) * springForce;
           }
         }
 
@@ -399,8 +404,17 @@ export default function WordWebPage() {
     return () => cancelAnimationFrame(animationId);
   }, [nodes.length, edges, dimensions, findConnectedComponents]);
 
+  // Filter nodes by minimum connections for debugging
+  const filteredNodes = minConnections > 0
+    ? nodes.filter((n) => n.connections >= minConnections)
+    : nodes;
+  const filteredNodeIds = new Set(filteredNodes.map((n) => n.id));
+  const filteredEdges = edges.filter(
+    (e) => filteredNodeIds.has(e.source) && filteredNodeIds.has(e.target)
+  );
+
   // Create node map for rendering
-  const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+  const nodeMap = new Map(filteredNodes.map((n) => [n.id, n]));
 
   // Get node at position
   const getNodeAtPosition = useCallback((clientX: number, clientY: number): Node | null => {
@@ -613,14 +627,25 @@ export default function WordWebPage() {
       {/* Stats bar */}
       <div className="flex items-center justify-center gap-6 py-2 px-4 bg-[var(--surface)] border-b border-[var(--border)] text-sm">
         <span className="text-[var(--text-muted)]">
-          <span className="font-bold text-[var(--text)]">{nodes.length}</span> words
+          <span className="font-bold text-[var(--text)]">{filteredNodes.length}</span>{minConnections > 0 ? `/${nodes.length}` : ''} words
         </span>
         <span className="text-[var(--text-muted)]">
-          <span className="font-bold text-[var(--text)]">{edges.length}</span> connections
+          <span className="font-bold text-[var(--text)]">{filteredEdges.length}</span>{minConnections > 0 ? `/${edges.length}` : ''} connections
         </span>
         <span className="text-[var(--text-muted)]">
           Zoom: <span className="font-bold text-[var(--text)]">{Math.round(scale * 100)}%</span>
         </span>
+        <label className="flex items-center gap-2 text-[var(--text-muted)]">
+          Min connections:
+          <input
+            type="number"
+            min="0"
+            max="20"
+            value={minConnections}
+            onChange={(e) => setMinConnections(Math.max(0, parseInt(e.target.value) || 0))}
+            className="w-14 px-2 py-0.5 text-sm rounded bg-[var(--background)] border border-[var(--border)] text-[var(--text)]"
+          />
+        </label>
       </div>
 
       {/* SVG container */}
@@ -639,7 +664,7 @@ export default function WordWebPage() {
         >
           <g transform={`translate(${offset.x}, ${offset.y}) scale(${scale})`}>
             {/* Draw edges */}
-            {edges.map((edge) => {
+            {filteredEdges.map((edge) => {
               const source = nodeMap.get(edge.source);
               const target = nodeMap.get(edge.target);
               if (!source || !target) return null;
@@ -672,7 +697,7 @@ export default function WordWebPage() {
             })}
 
             {/* Draw nodes */}
-            {nodes.map((node) => {
+            {filteredNodes.map((node) => {
               const radius = Math.min(8 + node.connections * 2, 25);
               const isSelected = selectedNode?.id === node.id;
               const isHovered = hoveredNode?.id === node.id;

@@ -5,7 +5,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 export async function GET(request: NextRequest) {
   try {
     const sessionId = request.nextUrl.searchParams.get('sessionId');
-    const puzzleId = request.nextUrl.searchParams.get('puzzleId');
+    let puzzleId = request.nextUrl.searchParams.get('puzzleId');
 
     if (!sessionId) {
       return NextResponse.json({ error: 'Missing sessionId' }, { status: 400 });
@@ -13,7 +13,21 @@ export async function GET(request: NextRequest) {
 
     const supabase = createServiceClient();
 
-    // Get completion for this puzzle (if puzzleId provided) or today's puzzle
+    // If no puzzleId provided, fetch today's puzzle
+    if (!puzzleId) {
+      const today = new Date().toISOString().split('T')[0];
+      const { data: todayPuzzle } = await supabase
+        .from('daily_puzzles')
+        .select('id')
+        .eq('puzzle_date', today)
+        .single();
+
+      if (todayPuzzle) {
+        puzzleId = todayPuzzle.id;
+      }
+    }
+
+    // Get completion for this puzzle
     let completion = null;
     if (puzzleId) {
       const { data } = await supabase
