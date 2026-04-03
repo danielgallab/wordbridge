@@ -4,6 +4,7 @@ import { useEffect, useCallback } from 'react';
 import { useDailyStore } from '@/stores/dailyStore';
 import { getSessionId } from '@/lib/sessionId';
 import { WordInput } from '@/components/game/WordInput';
+import { ChainDisplay } from '@/components/game/ChainDisplay';
 import { DailyCompletionModal } from './DailyCompletionModal';
 import { calculatePathQuality } from '@/lib/scoring';
 
@@ -114,34 +115,12 @@ export function DailyChallenge() {
           <div className="text-xs uppercase tracking-wider text-[var(--text-muted)] font-bold mb-2">
             Your Chain ({chain.length - 1} {chain.length === 2 ? 'word' : 'words'})
           </div>
-          <div className="flex flex-wrap items-center gap-1">
-            {chain.map((word, index) => (
-              <span key={index} className="flex items-center">
-                <span
-                  className={`font-mono text-sm uppercase px-2 py-1 rounded ${
-                    index === 0
-                      ? 'bg-[var(--present)]/20 text-[var(--present)]'
-                      : word === puzzle.target_word.toLowerCase()
-                      ? 'bg-[var(--correct)]/20 text-[var(--correct)]'
-                      : 'bg-[var(--background)] text-[var(--text)]'
-                  }`}
-                >
-                  {word}
-                </span>
-                {index < chain.length - 1 && (
-                  <span className="text-[var(--text-muted)] mx-1">→</span>
-                )}
-              </span>
-            ))}
-            {!isComplete && (
-              <>
-                <span className="text-[var(--text-muted)] mx-1">→</span>
-                <span className="font-mono text-sm uppercase px-2 py-1 rounded bg-[var(--correct)]/10 text-[var(--correct)] border border-dashed border-[var(--correct)]/30">
-                  {puzzle.target_word}
-                </span>
-              </>
-            )}
-          </div>
+          <ChainDisplay
+            chain={chain}
+            targetWord={puzzle.target_word}
+            isPlayer
+            isValidating={isValidating}
+          />
         </div>
 
         {/* Word Input */}
