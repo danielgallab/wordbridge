@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Footer } from '@/components/Footer';
+import { Analytics } from '@vercel/analytics/next';
 
 const title = 'Word Bridge';
 const description =
@@ -39,6 +40,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-[var(--background)] text-[var(--text)]">
                 {children}
         <Footer />
+        <Analytics />
       </body>
     </html>
   );
