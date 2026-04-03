@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, HelpCircle, Network, Plus, LogIn } from 'lucide-react';
@@ -8,7 +8,7 @@ import { useGameStore } from '@/stores/gameStore';
 import { Tutorial } from '@/components/Tutorial';
 import { useTutorial } from '@/hooks/useTutorial';
 
-export default function MultiplayerPage() {
+function MultiplayerContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialAction = searchParams.get('action');
@@ -262,5 +262,13 @@ export default function MultiplayerPage() {
       {/* Tutorial Modal */}
       {isLoaded && showTutorial && <Tutorial onClose={closeTutorial} />}
     </main>
+  );
+}
+
+export default function MultiplayerPage() {
+  return (
+    <Suspense fallback={<div className="flex-1 flex items-center justify-center">Loading...</div>}>
+      <MultiplayerContent />
+    </Suspense>
   );
 }
