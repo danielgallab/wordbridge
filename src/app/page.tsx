@@ -9,7 +9,7 @@ export default async function Home() {
 
   return (
     <main className="flex-1 flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-md pt-8 sm:pt-12">
         {/* Logo */}
         <h1 className="text-3xl sm:text-4xl font-bold text-center mb-2 tracking-tight">
           WORDBRIDGE
