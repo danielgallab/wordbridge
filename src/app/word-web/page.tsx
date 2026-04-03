@@ -46,9 +46,8 @@ export default function WordWebPage() {
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const targetScale = useRef(1);
   const targetOffset = useRef({ x: 0, y: 0 });
-  const isDragging = useRef(false);
-  const dragStart = useRef({ x: 0, y: 0 });
-  const draggedNode = useRef<Node | null>(null);
+  const isPanning = useRef(false);
+  const panStart = useRef({ x: 0, y: 0 });
 
   // Smooth zoom animation - use refs to avoid infinite loops
   const currentScaleRef = useRef(1);
@@ -322,8 +321,6 @@ export default function WordWebPage() {
         const node = updatedNodes[i];
         const nodeComponent = nodeToComponent.get(node.id) ?? 0;
 
-        // Skip if being dragged
-        if (draggedNode.current?.id === node.id) continue;
 
         let fx = 0;
         let fy = 0;
@@ -411,8 +408,11 @@ export default function WordWebPage() {
     if (!svg) return null;
 
     const rect = svg.getBoundingClientRect();
-    const x = (clientX - rect.left - offset.x) / scale;
-    const y = (clientY - rect.top - offset.y) / scale;
+    // Use refs to get current offset/scale values
+    const currentOffset = currentOffsetRef.current;
+    const currentScale = currentScaleRef.current;
+    const x = (clientX - rect.left - currentOffset.x) / currentScale;
+    const y = (clientY - rect.top - currentOffset.y) / currentScale;
 
     for (const node of nodes) {
       const radius = Math.min(8 + node.connections * 2, 25);
@@ -423,49 +423,31 @@ export default function WordWebPage() {
       }
     }
     return null;
-  }, [nodes, scale, offset]);
+  }, [nodes]);
 
   // Mouse handlers
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    const node = getNodeAtPosition(e.clientX, e.clientY);
-    if (node) {
-      draggedNode.current = node;
-    } else {
-      isDragging.current = true;
-      dragStart.current = { x: e.clientX - targetOffset.current.x, y: e.clientY - targetOffset.current.y };
-    }
-  }, [getNodeAtPosition]);
+    isPanning.current = true;
+    panStart.current = { x: e.clientX - targetOffset.current.x, y: e.clientY - targetOffset.current.y };
+  }, []);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (draggedNode.current) {
-      const svg = svgRef.current;
-      if (!svg) return;
-      const rect = svg.getBoundingClientRect();
-      const x = (e.clientX - rect.left - offset.x) / scale;
-      const y = (e.clientY - rect.top - offset.y) / scale;
-
-      setNodes((prev) => prev.map((n) =>
-        n.id === draggedNode.current?.id
-          ? { ...n, x, y, vx: 0, vy: 0 }
-          : n
-      ));
-    } else if (isDragging.current) {
+    if (isPanning.current) {
       const newOffset = {
-        x: e.clientX - dragStart.current.x,
-        y: e.clientY - dragStart.current.y,
+        x: e.clientX - panStart.current.x,
+        y: e.clientY - panStart.current.y,
       };
       targetOffset.current = newOffset;
-      currentOffsetRef.current = newOffset; // Keep in sync for responsive panning
+      currentOffsetRef.current = newOffset;
       setOffset(newOffset);
     } else {
       const node = getNodeAtPosition(e.clientX, e.clientY);
       setHoveredNode(node);
     }
-  }, [getNodeAtPosition, offset, scale]);
+  }, [getNodeAtPosition]);
 
   const handleMouseUp = useCallback(() => {
-    isDragging.current = false;
-    draggedNode.current = null;
+    isPanning.current = false;
   }, []);
 
   const handleClick = useCallback((e: React.MouseEvent) => {
@@ -732,6 +714,7 @@ export default function WordWebPage() {
                       fontFamily="system-ui, sans-serif"
                       textAnchor="middle"
                       dominantBaseline="middle"
+                      style={{ pointerEvents: 'none', userSelect: 'none' }}
                     >
                       {node.label.toUpperCase()}
                     </text>
