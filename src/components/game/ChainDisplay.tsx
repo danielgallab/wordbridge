@@ -56,6 +56,9 @@ export function ChainDisplay({ chain, targetWord, isPlayer = false, isValidating
         const isLastWord = index === items.length - 1;
         const isPending = isPlayer && isValidating && isLastWord && !isStart;
 
+        // Highlight the last word (user's most recent input) unless it's the target
+        const shouldHighlight = isLastWord && !isTarget && !isPending;
+
         return (
           <div key={`${word}-${index}`}>
             {/* Connecting arrow between words */}
@@ -68,9 +71,9 @@ export function ChainDisplay({ chain, targetWord, isPlayer = false, isValidating
               className={`
                 px-2 sm:px-3 py-1.5 sm:py-2 rounded-md font-bold uppercase text-xs sm:text-sm
                 flex items-center justify-between
-                ${isStart ? 'bg-[var(--present)] text-white' : ''}
+                ${shouldHighlight ? 'bg-[var(--present)] text-white' : ''}
                 ${isTarget ? 'bg-[var(--correct)] text-white' : ''}
-                ${!isStart && !isTarget ? 'bg-[var(--surface)] border border-[var(--border)]' : ''}
+                ${!shouldHighlight && !isTarget ? 'bg-[var(--surface)] border border-[var(--border)]' : ''}
                 ${isPending ? 'opacity-60 animate-pulse-pending' : ''}
               `}
               style={{

@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS word_associations (
   word1 TEXT NOT NULL,
   word2 TEXT NOT NULL,
   is_valid BOOLEAN NOT NULL,
+  rejection_reason TEXT,
   validated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(word1, word2)
 );

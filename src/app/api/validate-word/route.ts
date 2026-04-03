@@ -123,13 +123,16 @@ export async function POST(request: NextRequest) {
 
     // Cache the result (including rejection reason)
     start = performance.now();
-    await supabase.from('word_associations').insert({
+    const { error: insertError } = await supabase.from('word_associations').insert({
       word1: w1,
       word2: w2,
       is_valid: isValid,
       rejection_reason: rejectionReason,
     });
     timings['cacheInsert'] = performance.now() - start;
+    if (insertError) {
+      console.error(`[Cache Insert Error] "${w1}" <-> "${w2}":`, insertError.message);
+    }
 
     timings['total'] = performance.now() - totalStart;
     console.log(`[Validate Word] "${w1}" <-> "${w2}" | CACHE MISS | Timings (ms):`, JSON.stringify(timings));

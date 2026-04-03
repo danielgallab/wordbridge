@@ -2,6 +2,51 @@ import { create } from 'zustand';
 import type { DailyPuzzle, DailyCompletion, PlayerStats, LeaderboardEntry } from '@/types';
 import type { DailyData } from '@/lib/daily.server';
 
+// localStorage key for persisting in-progress chain
+const CHAIN_STORAGE_KEY = 'wordbridge_daily_chain';
+
+interface StoredChain {
+  puzzleDate: string;
+  chain: string[];
+}
+
+function saveChainToStorage(puzzleDate: string, chain: string[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const data: StoredChain = { puzzleDate, chain };
+    localStorage.setItem(CHAIN_STORAGE_KEY, JSON.stringify(data));
+  } catch {
+    // localStorage might be unavailable or full
+  }
+}
+
+function loadChainFromStorage(puzzleDate: string): string[] | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const stored = localStorage.getItem(CHAIN_STORAGE_KEY);
+    if (!stored) return null;
+    const data: StoredChain = JSON.parse(stored);
+    // Only return chain if it's for today's puzzle
+    if (data.puzzleDate === puzzleDate) {
+      return data.chain;
+    }
+    // Clear stale data from previous days
+    localStorage.removeItem(CHAIN_STORAGE_KEY);
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function clearChainStorage(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(CHAIN_STORAGE_KEY);
+  } catch {
+    // Ignore errors
+  }
+}
+
 export type RejectionReason =
   | 'not_related'
   | 'already_used'
@@ -76,11 +121,27 @@ export const useDailyStore = create<DailyState>((set, get) => ({
   setSessionId: (sessionId) => set({ sessionId }),
 
   initializeWithData: (data, sessionId) => {
+    let chain: string[];
+
+    if (data.hasCompletedToday && data.completion) {
+      // User already completed today's puzzle - show their solution
+      chain = data.completion.chain;
+      clearChainStorage();
+    } else {
+      // Check for saved progress from localStorage
+      const savedChain = loadChainFromStorage(data.puzzle.puzzle_date);
+      if (savedChain && savedChain.length > 0 && savedChain[0] === data.puzzle.start_word) {
+        // Restore saved progress
+        chain = savedChain;
+      } else {
+        // Start fresh
+        chain = [data.puzzle.start_word];
+      }
+    }
+
     set({
       puzzle: data.puzzle,
-      chain: data.hasCompletedToday && data.completion
-        ? data.completion.chain
-        : [data.puzzle.start_word],
+      chain,
       isComplete: data.hasCompletedToday,
       hasCompletedToday: data.hasCompletedToday,
       previousCompletion: data.completion,
@@ -116,11 +177,23 @@ export const useDailyStore = create<DailyState>((set, get) => ({
         statusData = await statusResponse.json();
       }
 
+      let chain: string[];
+      if (statusData?.hasCompleted && statusData?.completion) {
+        chain = statusData.completion.chain;
+        clearChainStorage();
+      } else {
+        // Check for saved progress
+        const savedChain = loadChainFromStorage(puzzle.puzzle_date);
+        if (savedChain && savedChain.length > 0 && savedChain[0] === puzzle.start_word) {
+          chain = savedChain;
+        } else {
+          chain = [puzzle.start_word];
+        }
+      }
+
       set({
         puzzle,
-        chain: statusData?.hasCompleted && statusData?.completion
-          ? statusData.completion.chain
-          : [puzzle.start_word],
+        chain,
         isLoading: false,
         hasCompletedToday: statusData?.hasCompleted ?? false,
         previousCompletion: statusData?.completion ?? null,
@@ -241,8 +314,14 @@ export const useDailyStore = create<DailyState>((set, get) => ({
         hasCompletedToday: data.isComplete && !data.isPractice ? true : state.hasCompletedToday,
       });
 
-      // If completed, load leaderboard and stats
+      // Save progress to localStorage (only for non-practice, non-complete attempts)
+      if (!state.isPracticeMode && !data.isComplete && state.puzzle) {
+        saveChainToStorage(state.puzzle.puzzle_date, data.chain);
+      }
+
+      // If completed, clear localStorage and load leaderboard/stats
       if (data.isComplete) {
+        clearChainStorage();
         await get().loadLeaderboard();
         await get().loadStatus();
       }
