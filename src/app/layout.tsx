@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import { Footer } from '@/components/Footer';
 
 export const metadata: Metadata = {
   title: 'WordBridge',
@@ -22,6 +23,7 @@ export default function RootLayout({
     <html lang="en" className="h-full">
       <body className="min-h-full flex flex-col bg-[var(--background)] text-[var(--text)]">
         {children}
+        <Footer />
       </body>
     </html>
   );

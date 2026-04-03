@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
+import { ArrowLeft, Search, X } from 'lucide-react';
 
 interface Node {
   id: string;
@@ -572,28 +573,12 @@ export default function WordWebPage() {
       {/* Header */}
       <header className="flex items-center justify-between p-4 border-b border-[var(--border)] gap-4">
         <Link href="/" className="text-[var(--text-muted)] hover:text-[var(--text)] transition-colors flex-shrink-0">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M19 12H5M12 19l-7-7 7-7"/>
-          </svg>
+          <ArrowLeft size={20} />
         </Link>
         <h1 className="text-xl font-bold flex-shrink-0">Word Web</h1>
         <div className="relative flex-1 max-w-xs">
           <div className="relative">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
-            >
-              <circle cx="11" cy="11" r="8"/>
-              <path d="m21 21-4.3-4.3"/>
-            </svg>
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
             <input
               ref={searchInputRef}
               type="text"
@@ -759,9 +744,7 @@ export default function WordWebPage() {
                 onClick={() => setSelectedNode(null)}
                 className="text-[var(--text-muted)] hover:text-[var(--text)]"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M18 6L6 18M6 6l12 12"/>
-                </svg>
+                <X size={16} />
               </button>
             </div>
             <p className="text-sm text-[var(--text-muted)] mb-3">

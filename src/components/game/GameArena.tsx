@@ -2,6 +2,7 @@
 
 import { useCallback, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { Upload, Trophy, Skull, Handshake } from 'lucide-react';
 import { Timer } from './Timer';
 import { PlayerPanel } from './PlayerPanel';
 import { useGameStore } from '@/stores/gameStore';
@@ -282,8 +283,14 @@ export function GameArena() {
       {showGameOver && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
           <div className="bg-[var(--background)] border-2 border-[var(--border)] rounded-xl p-4 sm:p-8 text-center max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="text-4xl sm:text-5xl mb-3 sm:mb-4">
-              {winner === 'me' ? '🏆' : winner === 'opponent' ? '💀' : '🤝'}
+            <div className="text-4xl sm:text-5xl mb-3 sm:mb-4 flex justify-center">
+              {winner === 'me' ? (
+                <Trophy className="w-12 h-12 sm:w-14 sm:h-14 text-[var(--correct)]" />
+              ) : winner === 'opponent' ? (
+                <Skull className="w-12 h-12 sm:w-14 sm:h-14 text-[var(--error)]" />
+              ) : (
+                <Handshake className="w-12 h-12 sm:w-14 sm:h-14 text-[var(--present)]" />
+              )}
             </div>
             <h2
               className={`text-xl sm:text-2xl font-bold mb-2 ${
@@ -335,19 +342,7 @@ export function GameArena() {
               onClick={handleShare}
               className="w-full py-2 rounded-md bg-[var(--surface)] border border-[var(--border)] text-[var(--text)] font-bold hover:opacity-90 transition-opacity mb-3 flex items-center justify-center gap-2"
             >
-              <svg
-                className="w-4 h-4"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-                <polyline points="16 6 12 2 8 6" />
-                <line x1="12" y1="2" x2="12" y2="15" />
-              </svg>
+              <Upload className="w-4 h-4" />
               {shareStatus === 'copied' ? 'Copied!' : 'Share Result'}
             </button>
 

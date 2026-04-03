@@ -1,5 +1,7 @@
 'use client';
 
+import { ArrowDown } from 'lucide-react';
+
 interface ChainDisplayProps {
   chain: string[];
   targetWord: string;
@@ -31,17 +33,7 @@ export function ChainDisplay({ chain, targetWord, isPlayer = false, isValidating
           <div key={i}>
             {/* Connecting arrow */}
             <div className="flex justify-center py-0.5">
-              <svg
-                className="w-3 h-3 text-[var(--text-muted)] opacity-40"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M12 5v14M5 12l7 7 7-7" />
-              </svg>
+              <ArrowDown className="w-3 h-3 text-[var(--text-muted)] opacity-40" />
             </div>
             <div className="px-2 sm:px-3 py-1.5 sm:py-2 rounded-md font-bold uppercase text-xs sm:text-sm flex items-center justify-between bg-[var(--surface)] border border-[var(--border)]">
               <span className="blur-sm select-none text-[var(--text-muted)]">????</span>
@@ -69,17 +61,7 @@ export function ChainDisplay({ chain, targetWord, isPlayer = false, isValidating
             {/* Connecting arrow between words */}
             {index > 0 && (
               <div className="flex justify-center py-0.5">
-                <svg
-                  className="w-3 h-3 text-[var(--text-muted)] animate-arrow-appear"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M12 5v14M5 12l7 7 7-7" />
-                </svg>
+                <ArrowDown className="w-3 h-3 text-[var(--text-muted)] animate-arrow-appear" />
               </div>
             )}
             <div

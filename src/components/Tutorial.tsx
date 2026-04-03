@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { Waypoints, Trophy, Meh, Lightbulb, Check, X } from 'lucide-react';
 
 interface TutorialProps {
   onClose: () => void;
@@ -12,7 +13,7 @@ const TUTORIAL_STEPS = [
     description: 'Build word chains to connect two words. Let\'s learn how to play!',
     visual: (
       <div className="flex items-center justify-center gap-2 py-4">
-        <div className="text-4xl">🌉</div>
+        <Waypoints className="w-12 h-12 text-[var(--present)]" />
       </div>
     ),
   },
@@ -66,17 +67,17 @@ const TUTORIAL_STEPS = [
     visual: (
       <div className="flex flex-col gap-2.5 py-4 text-sm">
         <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-[var(--correct)]/10 border border-[var(--correct)]/30">
-          <span className="text-[var(--correct)] font-bold">✓</span>
+          <Check className="w-4 h-4 text-[var(--correct)]" />
           <span>CAT → PET</span>
           <span className="text-xs text-[var(--text-muted)] ml-auto">(direct)</span>
         </div>
         <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-[var(--error)]/10 border border-[var(--error)]/30 opacity-75">
-          <span className="text-[var(--error)] font-bold">✗</span>
+          <X className="w-4 h-4 text-[var(--error)]" />
           <span className="line-through">CAT → ROCKET</span>
           <span className="text-xs text-[var(--error)] ml-auto">no connection</span>
         </div>
         <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-[var(--error)]/10 border border-[var(--error)]/30 opacity-75">
-          <span className="text-[var(--error)] font-bold">✗</span>
+          <X className="w-4 h-4 text-[var(--error)]" />
           <span className="line-through">TREE → LEG</span>
           <span className="text-xs text-[var(--error)] ml-auto">too indirect</span>
         </div>
@@ -93,12 +94,16 @@ const TUTORIAL_STEPS = [
       <div className="flex flex-col items-center gap-4 py-4">
         <div className="flex items-center gap-6">
           <div className="text-center">
-            <div className="text-2xl mb-1">🏆</div>
+            <div className="flex justify-center mb-1">
+              <Trophy className="w-8 h-8 text-[var(--correct)]" />
+            </div>
             <div className="text-xs text-[var(--correct)] font-bold">3 steps</div>
           </div>
           <div className="text-[var(--text-muted)]">vs</div>
           <div className="text-center">
-            <div className="text-2xl mb-1">😅</div>
+            <div className="flex justify-center mb-1">
+              <Meh className="w-8 h-8 text-[var(--text-muted)]" />
+            </div>
             <div className="text-xs text-[var(--text-muted)]">5 steps</div>
           </div>
         </div>
@@ -114,15 +119,15 @@ const TUTORIAL_STEPS = [
     visual: (
       <div className="flex flex-col gap-3 py-4 text-sm">
         <div className="flex items-center gap-2">
-          <span className="text-lg">💡</span>
+          <Lightbulb className="w-5 h-5 text-[var(--present)]" />
           <span className="text-[var(--text-muted)]">OCEAN → WATER → DRINK</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-lg">💡</span>
+          <Lightbulb className="w-5 h-5 text-[var(--present)]" />
           <span className="text-[var(--text-muted)]">FAST → SPEED → CAR</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-lg">💡</span>
+          <Lightbulb className="w-5 h-5 text-[var(--present)]" />
           <span className="text-[var(--text-muted)]">KING → ROYAL → CROWN</span>
         </div>
       </div>

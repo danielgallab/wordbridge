@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Upload, Plus, LogIn, CheckCircle, PartyPopper } from 'lucide-react';
 import { useDailyStore } from '@/stores/dailyStore';
 import { DailyLeaderboard } from './DailyLeaderboard';
 import { DailyStats } from './DailyStats';
@@ -73,13 +74,17 @@ export function DailyCompletionModal({
         <div className="text-center mb-4">
           {alreadyCompleted ? (
             <>
-              <div className="text-3xl mb-2">✅</div>
+              <div className="flex justify-center mb-2">
+                <CheckCircle className="w-10 h-10 text-[var(--correct)]" />
+              </div>
               <h2 className="text-xl font-bold text-[var(--text)]">Already Completed!</h2>
               <p className="text-sm text-[var(--text-muted)]">{today}</p>
             </>
           ) : (
             <>
-              <div className="text-4xl mb-2">{pathQuality?.emoji || '🎉'}</div>
+              <div className="flex justify-center mb-2">
+                <PartyPopper className="w-12 h-12 text-[var(--correct)]" />
+              </div>
               <h2 className="text-xl font-bold text-[var(--correct)]">
                 {pathQuality?.description || 'Completed!'}
               </h2>
@@ -117,19 +122,7 @@ export function DailyCompletionModal({
             onClick={handleShare}
             className="w-full py-3 rounded-md bg-[var(--correct)] text-white font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
           >
-            <svg
-              className="w-4 h-4"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-              <polyline points="16 6 12 2 8 6" />
-              <line x1="12" y1="2" x2="12" y2="15" />
-            </svg>
+            <Upload className="w-4 h-4" />
             {shareStatus === 'copied' ? 'Copied!' : 'Share Result'}
           </button>
 
@@ -141,27 +134,23 @@ export function DailyCompletionModal({
             Practice Again
           </button>
 
-          {/* Multiplayer Button */}
-          <Link
-            href="/multiplayer"
-            className="w-full py-3 rounded-md bg-[var(--present)] text-white font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
-          >
-            <svg
-              className="w-4 h-4"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+          {/* Multiplayer Buttons */}
+          <div className="flex gap-2">
+            <Link
+              href="/multiplayer?action=create"
+              className="flex-1 py-3 rounded-md bg-[var(--correct)] text-white font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
             >
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-              <circle cx="9" cy="7" r="4" />
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-            </svg>
-            Challenge a Friend
-          </Link>
+              <Plus className="w-4 h-4" />
+              Create Room
+            </Link>
+            <Link
+              href="/multiplayer?action=join"
+              className="flex-1 py-3 rounded-md bg-[var(--present)] text-white font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+            >
+              <LogIn className="w-4 h-4" />
+              Join Room
+            </Link>
+          </div>
         </div>
 
         {/* Next Puzzle Countdown */}

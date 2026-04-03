@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useCallback, useRef } from 'react';
+import Link from 'next/link';
+import { Plus, LogIn } from 'lucide-react';
 import { useDailyStore } from '@/stores/dailyStore';
 import { ensureSessionId } from '@/lib/sessionId';
 import { WordInput } from '@/components/game/WordInput';
@@ -149,6 +151,31 @@ export function DailyChallenge({ initialData }: DailyChallengeProps) {
           Session: {sessionId.slice(0, 8)}...
         </p>
       )}
+
+      {/* Multiplayer CTA */}
+      <div className="mt-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="flex-1 h-px bg-[var(--border)]" />
+          <span className="text-xs text-[var(--text-muted)] uppercase">or play with friends</span>
+          <div className="flex-1 h-px bg-[var(--border)]" />
+        </div>
+        <div className="flex gap-2">
+          <Link
+            href="/multiplayer?action=create"
+            className="flex-1 py-3 rounded-md bg-[var(--correct)] text-white font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            Create Room
+          </Link>
+          <Link
+            href="/multiplayer?action=join"
+            className="flex-1 py-3 rounded-md bg-[var(--present)] text-white font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+          >
+            <LogIn className="w-4 h-4" />
+            Join Room
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }
