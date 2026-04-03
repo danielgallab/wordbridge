@@ -34,45 +34,9 @@ RULES:
 
 Generate a unique and creative word pair. Surprise the player with unexpected words.`;
 
-export const WORD_VALIDATION_PROMPT = `You are a STRICT word association validator for a word chain game. Your job is to REJECT weak connections.
-
-STEP 1 - WORD VALIDITY:
-Both words must be REAL English dictionary words. Reject abbreviations, acronyms, slang, gibberish, or misspellings.
-
-STEP 2 - CONNECTION TEST:
-Only accept connections that are IMMEDIATE and OBVIOUS. Ask yourself: "Would 8 out of 10 people instantly see this connection?"
-
-VALID connection types:
-- Direct synonyms/antonyms (happy/sad, big/large)
-- Immediate associations (coffee/cup, rain/umbrella, dog/bark)
-- Direct properties (fire/hot, ice/cold, brick/hard)
-- Clear part-whole (wheel/car, page/book)
-- Common collocations (hard/rain, birthday/cake)
-- Same SMALL category with few members (apple/orange - fruits, summer/fall - seasons, Monday/Tuesday - days)
-
-INVALID - REJECT these:
-- Sharing a broad category is NOT enough (brick/skyscraper - both "construction" is too vague)
-- Multi-hop reasoning (tree/leg requires: tree→wood→furniture→legs - REJECT)
-- Tenuous or "technically true" connections
-- Connections that require explanation or justification
-
-BE STRICT about weak/indirect connections, but DO NOT overthink obvious pairs. If the connection is immediately clear to most people (like drink/water, eat/food), accept it. Don't reject based on grammatical technicalities like "verb vs noun" — focus on whether the conceptual link is obvious.
-
-REJECTION REASONS - When rejecting, you MUST provide a rejection_reason:
-- "not_related": No meaningful connection exists between the words
-- "too_abstract": Connection exists but is too conceptual/philosophical
-- "multi_hop": Connection requires intermediate steps (e.g., tree→leg needs tree→wood→furniture→leg)
-- "proper_noun": Word is a proper noun (name, place, brand)
-- "misspelled": Word appears to be misspelled
-- "invalid_word": Not a recognizable English word
-
-Examples:
-- fire,hot = YES (direct property)
-- rain,umbrella = YES (immediate association)
-- brick,wall = YES (bricks make walls)
-- brick,skyscraper = NO, rejection_reason: "too_abstract" (too indirect - skyscrapers aren't made of bricks)
-- tree,leg = NO, rejection_reason: "multi_hop" (requires multi-hop: tree→furniture→legs)
-- computer,elephant = NO, rejection_reason: "not_related" (no connection)
-- green,cs = NO, rejection_reason: "invalid_word" (cs is not a word)
-- paris,tower = NO, rejection_reason: "proper_noun" (Paris is a proper noun)
-- speling,word = NO, rejection_reason: "misspelled" (speling is misspelled)`;
+// Optimized short prompt for faster LLM response
+export const WORD_VALIDATION_PROMPT = `Word association validator. r=true if reasonable connection exists.
+ACCEPT: synonyms, associations (bird/nest, dog/bark), properties (fire/hot), compounds (bird/house=birdhouse), categories (apple/orange).
+REJECT: no connection, multi-hop reasoning, proper nouns, misspellings.
+Be lenient - if most people would see a connection, accept it.
+x codes: n=not_related, a=too_abstract, m=multi_hop, p=proper_noun, s=misspelled, i=invalid_word`;

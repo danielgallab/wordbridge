@@ -15,18 +15,21 @@ export type RejectionReason =
   | 'multi_hop'
   | 'misspelled';
 
+// Minimal schema for faster response (no reasoning = fewer output tokens)
 const WordAssociationResult = z.object({
-  reasoning: z.string(),
-  related: z.boolean(),
-  rejection_reason: z.enum([
-    'not_related',
-    'too_abstract',
-    'multi_hop',
-    'proper_noun',
-    'misspelled',
-    'invalid_word',
-  ]).nullable(),
+  r: z.boolean(), // related
+  x: z.enum(['n', 'a', 'm', 'p', 's', 'i']).nullable(), // rejection: not_related, abstract, multi_hop, proper_noun, misspelled, invalid
 });
+
+// Map short codes back to full rejection reasons
+const rejectionMap: Record<string, RejectionReason> = {
+  n: 'not_related',
+  a: 'too_abstract',
+  m: 'multi_hop',
+  p: 'proper_noun',
+  s: 'misspelled',
+  i: 'invalid_word',
+};
 
 export async function POST(request: NextRequest) {
   const totalStart = performance.now();
@@ -99,20 +102,19 @@ export async function POST(request: NextRequest) {
         { role: 'user', content: `${w1},${w2}` },
       ],
       response_format: zodResponseFormat(WordAssociationResult, 'word_association'),
-      reasoning_effort: 'none',
-      verbosity: 'low',
+      max_completion_tokens: 50, // Minimal response needed
     });
     timings['openaiCall'] = performance.now() - start;
 
     const content = response.choices[0]?.message?.content;
     let isValid = false;
-    let rejectionReason: string | undefined;
+    let rejectionReason: RejectionReason | undefined;
     if (content) {
       try {
         const parsed = JSON.parse(content);
-        isValid = parsed.related === true;
-        rejectionReason = parsed.rejection_reason;
-        console.log(`[Word Validation] "${w1}" <-> "${w2}": ${isValid ? 'VALID' : 'INVALID'} | Reasoning: ${parsed.reasoning} | Rejection: ${rejectionReason || 'none'}`);
+        isValid = parsed.r === true;
+        rejectionReason = parsed.x ? rejectionMap[parsed.x] : undefined;
+        console.log(`[Word Validation] "${w1}" <-> "${w2}": ${isValid ? 'VALID' : 'INVALID'} | Rejection: ${rejectionReason || 'none'}`);
       } catch {
         isValid = false;
         rejectionReason = 'invalid_word';
