@@ -281,6 +281,24 @@ export default function WordWebPage() {
       };
     };
 
+    // Helper to check if two line segments intersect and get intersection info
+    function edgesIntersect(
+      x1: number, y1: number, x2: number, y2: number,
+      x3: number, y3: number, x4: number, y4: number
+    ): { intersects: boolean; t?: number; u?: number } {
+      const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+      if (Math.abs(denom) < 0.0001) return { intersects: false };
+
+      const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
+      const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom;
+
+      // Check if intersection is within both segments (not at endpoints)
+      if (t > 0.1 && t < 0.9 && u > 0.1 && u < 0.9) {
+        return { intersects: true, t, u };
+      }
+      return { intersects: false };
+    }
+
     function simulate() {
       const currentNodes = nodesRef.current;
       const updatedNodes = currentNodes.map(n => ({ ...n })); // Deep copy
@@ -293,6 +311,7 @@ export default function WordWebPage() {
       const interComponentRepulsion = 8000; // Strong repulsion between different components
       const minDistance = 60; // Increased minimum distance
       const maxVelocity = 10; // Cap velocity to prevent flying nodes
+      const crossingRepulsion = 15; // Force to untangle crossing edges
 
       // Apply forces
       for (let i = 0; i < updatedNodes.length; i++) {
