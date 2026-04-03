@@ -24,7 +24,7 @@ interface GraphData {
 }
 
 export default function WordWebPage() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
@@ -32,6 +32,10 @@ export default function WordWebPage() {
   const [error, setError] = useState<string | null>(null);
   const [hoveredNode, setHoveredNode] = useState<Node | null>(null);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Node[]>([]);
+  const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [dimensions, setDimensions] = useState(() => ({
     width: typeof window !== 'undefined' ? window.innerWidth : 800,
     height: typeof window !== 'undefined' ? window.innerHeight - 120 : 600, // Account for header/stats
@@ -398,101 +402,15 @@ export default function WordWebPage() {
     return () => cancelAnimationFrame(animationId);
   }, [nodes.length, edges, dimensions, findConnectedComponents]);
 
-  // Draw canvas
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const nodeMap = new Map(nodes.map((n) => [n.id, n]));
-
-    // Clear canvas
-    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--background').trim() || '#121213';
-    ctx.fillRect(0, 0, dimensions.width, dimensions.height);
-
-    // Apply transform
-    ctx.save();
-    ctx.translate(offset.x, offset.y);
-    ctx.scale(scale, scale);
-
-    // Draw edges
-    ctx.strokeStyle = 'rgba(128, 128, 128, 0.3)';
-    ctx.lineWidth = 1;
-    for (const edge of edges) {
-      const source = nodeMap.get(edge.source);
-      const target = nodeMap.get(edge.target);
-      if (source && target) {
-        // Highlight edges connected to selected/hovered node
-        if (selectedNode && (edge.source === selectedNode.id || edge.target === selectedNode.id)) {
-          ctx.strokeStyle = 'rgba(83, 141, 78, 0.8)';
-          ctx.lineWidth = 2;
-        } else if (hoveredNode && (edge.source === hoveredNode.id || edge.target === hoveredNode.id)) {
-          ctx.strokeStyle = 'rgba(181, 159, 59, 0.6)';
-          ctx.lineWidth = 1.5;
-        } else {
-          ctx.strokeStyle = 'rgba(128, 128, 128, 0.3)';
-          ctx.lineWidth = 1;
-        }
-        ctx.beginPath();
-        ctx.moveTo(source.x, source.y);
-        ctx.lineTo(target.x, target.y);
-        ctx.stroke();
-      }
-    }
-
-    // Draw nodes
-    for (const node of nodes) {
-      const radius = Math.min(8 + node.connections * 2, 25);
-      const isSelected = selectedNode?.id === node.id;
-      const isHovered = hoveredNode?.id === node.id;
-      const isConnectedToSelected = selectedNode && edges.some(
-        (e) => (e.source === selectedNode.id && e.target === node.id) ||
-               (e.target === selectedNode.id && e.source === node.id)
-      );
-
-      // Node fill
-      if (isSelected) {
-        ctx.fillStyle = '#538d4e';
-      } else if (isHovered) {
-        ctx.fillStyle = '#b59f3b';
-      } else if (isConnectedToSelected) {
-        ctx.fillStyle = '#538d4e80';
-      } else {
-        ctx.fillStyle = '#3a3a3c';
-      }
-
-      ctx.beginPath();
-      ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Node border
-      ctx.strokeStyle = isSelected || isHovered ? '#ffffff' : '#565758';
-      ctx.lineWidth = isSelected || isHovered ? 2 : 1;
-      ctx.stroke();
-
-      // Node label
-      ctx.fillStyle = '#ffffff';
-      ctx.font = `${Math.max(10, 12 - Math.floor(node.label.length / 3))}px system-ui, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-
-      // Only show label if zoomed in enough or node is highlighted
-      if (scale > 0.7 || isSelected || isHovered || isConnectedToSelected) {
-        ctx.fillText(node.label.toUpperCase(), node.x, node.y + radius + 12);
-      }
-    }
-
-    ctx.restore();
-  }, [nodes, edges, hoveredNode, selectedNode, dimensions, scale, offset]);
+  // Create node map for rendering
+  const nodeMap = new Map(nodes.map((n) => [n.id, n]));
 
   // Get node at position
   const getNodeAtPosition = useCallback((clientX: number, clientY: number): Node | null => {
-    const canvas = canvasRef.current;
-    if (!canvas) return null;
+    const svg = svgRef.current;
+    if (!svg) return null;
 
-    const rect = canvas.getBoundingClientRect();
+    const rect = svg.getBoundingClientRect();
     const x = (clientX - rect.left - offset.x) / scale;
     const y = (clientY - rect.top - offset.y) / scale;
 
@@ -520,9 +438,9 @@ export default function WordWebPage() {
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (draggedNode.current) {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const rect = canvas.getBoundingClientRect();
+      const svg = svgRef.current;
+      if (!svg) return;
+      const rect = svg.getBoundingClientRect();
       const x = (e.clientX - rect.left - offset.x) / scale;
       const y = (e.clientY - rect.top - offset.y) / scale;
 
@@ -561,10 +479,10 @@ export default function WordWebPage() {
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const svg = svgRef.current;
+    if (!svg) return;
 
-    const rect = canvas.getBoundingClientRect();
+    const rect = svg.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
@@ -591,6 +509,43 @@ export default function WordWebPage() {
         .filter((e) => e.source === selectedNode.id || e.target === selectedNode.id)
         .map((e) => (e.source === selectedNode.id ? e.target : e.source))
     : [];
+
+  // Search handler
+  const handleSearchChange = useCallback((query: string) => {
+    setSearchQuery(query);
+    if (query.trim() === '') {
+      setSearchResults([]);
+      setShowSearchDropdown(false);
+      return;
+    }
+    const lowerQuery = query.toLowerCase();
+    const results = nodes.filter((n) =>
+      n.label.toLowerCase().includes(lowerQuery)
+    ).slice(0, 8);
+    setSearchResults(results);
+    setShowSearchDropdown(results.length > 0);
+  }, [nodes]);
+
+  // Pan and zoom to a specific node
+  const focusOnNode = useCallback((node: Node) => {
+    setSelectedNode(node);
+    setSearchQuery('');
+    setShowSearchDropdown(false);
+    searchInputRef.current?.blur();
+
+    // Calculate the offset to center the node on screen
+    const targetZoom = 1.5;
+    const centerX = dimensions.width / 2;
+    const centerY = dimensions.height / 2;
+
+    const newOffset = {
+      x: centerX - node.x * targetZoom,
+      y: centerY - node.y * targetZoom,
+    };
+
+    targetScale.current = targetZoom;
+    targetOffset.current = newOffset;
+  }, [dimensions]);
 
   if (loading) {
     return (
@@ -619,14 +574,58 @@ export default function WordWebPage() {
   return (
     <main className="flex-1 flex flex-col">
       {/* Header */}
-      <header className="flex items-center justify-between p-4 border-b border-[var(--border)]">
-        <Link href="/" className="text-[var(--text-muted)] hover:text-[var(--text)] transition-colors">
+      <header className="flex items-center justify-between p-4 border-b border-[var(--border)] gap-4">
+        <Link href="/" className="text-[var(--text-muted)] hover:text-[var(--text)] transition-colors flex-shrink-0">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M19 12H5M12 19l-7-7 7-7"/>
           </svg>
         </Link>
-        <h1 className="text-xl font-bold">Word Web</h1>
-        <div className="w-5" />
+        <h1 className="text-xl font-bold flex-shrink-0">Word Web</h1>
+        <div className="relative flex-1 max-w-xs">
+          <div className="relative">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
+            >
+              <circle cx="11" cy="11" r="8"/>
+              <path d="m21 21-4.3-4.3"/>
+            </svg>
+            <input
+              ref={searchInputRef}
+              type="text"
+              placeholder="Search words..."
+              value={searchQuery}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              onFocus={() => searchResults.length > 0 && setShowSearchDropdown(true)}
+              onBlur={() => setTimeout(() => setShowSearchDropdown(false), 150)}
+              className="w-full pl-9 pr-3 py-1.5 text-sm rounded-md bg-[var(--surface)] border border-[var(--border)] focus:outline-none focus:border-[var(--text-muted)] placeholder:text-[var(--text-muted)]"
+            />
+          </div>
+          {showSearchDropdown && (
+            <div className="absolute top-full left-0 right-0 mt-1 bg-[var(--surface)] border border-[var(--border)] rounded-md shadow-lg z-50 overflow-hidden">
+              {searchResults.map((node) => (
+                <button
+                  key={node.id}
+                  onClick={() => focusOnNode(node)}
+                  className="w-full px-3 py-2 text-left text-sm hover:bg-[var(--background)] flex items-center justify-between"
+                >
+                  <span className="uppercase font-medium">{node.label}</span>
+                  <span className="text-xs text-[var(--text-muted)]">
+                    {node.connections} connection{node.connections !== 1 ? 's' : ''}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </header>
 
       {/* Stats bar */}
@@ -642,20 +641,106 @@ export default function WordWebPage() {
         </span>
       </div>
 
-      {/* Canvas container */}
+      {/* SVG container */}
       <div ref={containerRef} className="flex-1 relative overflow-hidden">
-        <canvas
-          ref={canvasRef}
+        <svg
+          ref={svgRef}
           width={dimensions.width}
           height={dimensions.height}
-          className="cursor-grab active:cursor-grabbing absolute inset-0 w-full h-full"
+          className="cursor-grab active:cursor-grabbing absolute inset-0 w-full h-full bg-[var(--background)]"
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
           onClick={handleClick}
           onWheel={handleWheel}
-        />
+        >
+          <g transform={`translate(${offset.x}, ${offset.y}) scale(${scale})`}>
+            {/* Draw edges */}
+            {edges.map((edge) => {
+              const source = nodeMap.get(edge.source);
+              const target = nodeMap.get(edge.target);
+              if (!source || !target) return null;
+
+              const isSelectedEdge = selectedNode && (edge.source === selectedNode.id || edge.target === selectedNode.id);
+              const isHoveredEdge = hoveredNode && (edge.source === hoveredNode.id || edge.target === hoveredNode.id);
+
+              let strokeColor = 'rgba(128, 128, 128, 0.3)';
+              let strokeWidth = 1;
+
+              if (isSelectedEdge) {
+                strokeColor = 'rgba(83, 141, 78, 0.8)';
+                strokeWidth = 2;
+              } else if (isHoveredEdge) {
+                strokeColor = 'rgba(181, 159, 59, 0.6)';
+                strokeWidth = 1.5;
+              }
+
+              return (
+                <line
+                  key={`${edge.source}-${edge.target}`}
+                  x1={source.x}
+                  y1={source.y}
+                  x2={target.x}
+                  y2={target.y}
+                  stroke={strokeColor}
+                  strokeWidth={strokeWidth / scale}
+                />
+              );
+            })}
+
+            {/* Draw nodes */}
+            {nodes.map((node) => {
+              const radius = Math.min(8 + node.connections * 2, 25);
+              const isSelected = selectedNode?.id === node.id;
+              const isHovered = hoveredNode?.id === node.id;
+              const isConnectedToSelected = selectedNode && edges.some(
+                (e) => (e.source === selectedNode.id && e.target === node.id) ||
+                       (e.target === selectedNode.id && e.source === node.id)
+              );
+
+              let fillColor = '#3a3a3c';
+              if (isSelected) {
+                fillColor = '#538d4e';
+              } else if (isHovered) {
+                fillColor = '#b59f3b';
+              } else if (isConnectedToSelected) {
+                fillColor = '#538d4e80';
+              }
+
+              const strokeColor = isSelected || isHovered ? '#ffffff' : '#565758';
+              const strokeWidth = (isSelected || isHovered ? 2 : 1) / scale;
+              const showLabel = scale > 0.7 || isSelected || isHovered || isConnectedToSelected;
+              const fontSize = Math.max(10, 12 - Math.floor(node.label.length / 3));
+
+              return (
+                <g key={node.id}>
+                  <circle
+                    cx={node.x}
+                    cy={node.y}
+                    r={radius}
+                    fill={fillColor}
+                    stroke={strokeColor}
+                    strokeWidth={strokeWidth}
+                  />
+                  {showLabel && (
+                    <text
+                      x={node.x}
+                      y={node.y + radius + 12}
+                      fill="#ffffff"
+                      fontSize={fontSize}
+                      fontFamily="system-ui, sans-serif"
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                    >
+                      {node.label.toUpperCase()}
+                    </text>
+                  )}
+                </g>
+              );
+            })}
+          </g>
+        </svg>
 
         {/* Selected node info panel */}
         {selectedNode && (
