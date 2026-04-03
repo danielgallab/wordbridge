@@ -15,18 +15,18 @@ export async function getRecentlyUsedWords(supabase: SupabaseClient): Promise<st
   const threeDaysAgo = new Date();
   threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
 
-  const { data: recentRooms } = await supabase
-    .from('rooms')
+  const { data: recentPairs } = await supabase
+    .from('word_pairs')
     .select('start_word, target_word')
-    .gte('created_at', threeDaysAgo.toISOString())
+    .gte('last_used_at', threeDaysAgo.toISOString())
     .limit(50);
 
-  if (!recentRooms) return [];
+  if (!recentPairs) return [];
 
   const words = new Set<string>();
-  for (const room of recentRooms) {
-    words.add(room.start_word);
-    words.add(room.target_word);
+  for (const pair of recentPairs) {
+    words.add(pair.start_word);
+    words.add(pair.target_word);
   }
   return Array.from(words);
 }
@@ -72,23 +72,22 @@ async function getCachedWordPair(supabase: SupabaseClient, difficulty: Difficult
 }
 
 async function storeWordPair(supabase: SupabaseClient, startWord: string, targetWord: string, difficulty: Difficulty, reasoning: string): Promise<void> {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('word_pairs')
-    .upsert({
+    .insert({
       start_word: startWord,
       target_word: targetWord,
       difficulty,
       reasoning,
       used_count: 1,
       last_used_at: new Date().toISOString(),
-    }, {
-      onConflict: 'start_word,target_word',
-    });
+    })
+    .select();
 
   if (error) {
     console.error('Failed to cache word pair:', error);
   } else {
-    console.log(`[Word Pair Cached] ${startWord} → ${targetWord} (${difficulty})`);
+    console.log(`[Word Pair Cached] ${startWord} → ${targetWord} (${difficulty})`, data);
   }
 }
 

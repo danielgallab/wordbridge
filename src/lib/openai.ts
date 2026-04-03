@@ -35,8 +35,13 @@ RULES:
 Generate a unique and creative word pair. Surprise the player with unexpected words.`;
 
 // Optimized short prompt for faster LLM response
-export const WORD_VALIDATION_PROMPT = `Word association validator. r=true if reasonable connection exists.
-ACCEPT: synonyms, associations (bird/nest, dog/bark), properties (fire/hot), compounds (bird/house=birdhouse), categories (apple/orange).
-REJECT: no connection, multi-hop reasoning, proper nouns, misspellings.
-Be lenient - if most people would see a connection, accept it.
+export const WORD_VALIDATION_PROMPT = `Word association validator. r=true ONLY if there's a direct, immediate connection.
+ACCEPT: direct synonyms, immediate associations (bird/nest, dog/bark), inherent properties (fire/hot), compound words (bird/house=birdhouse), same category (apple/orange).
+REJECT:
+- Weak/tenuous connections
+- Multi-hop reasoning (A→B→C is NOT valid, only A→B)
+- Abstract thematic links
+- Connections requiring explanation
+- Proper nouns, misspellings
+Be STRICT - reject if the connection isn't obvious and immediate. When in doubt, reject.
 x codes: n=not_related, a=too_abstract, m=multi_hop, p=proper_noun, s=misspelled, i=invalid_word`;
