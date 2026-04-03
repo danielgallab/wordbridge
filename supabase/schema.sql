@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS rooms (
   status TEXT DEFAULT 'waiting', -- waiting, playing, finished
   start_word TEXT NOT NULL,
   target_word TEXT NOT NULL,
+  difficulty TEXT DEFAULT 'medium' CHECK (difficulty IN ('easy', 'medium', 'hard')),
   time_limit INT DEFAULT 90,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   started_at TIMESTAMPTZ,
