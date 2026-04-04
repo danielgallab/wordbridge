@@ -34,13 +34,34 @@ RULES:
 
 Generate a unique and creative word pair. Surprise the player with unexpected words.`;
 
-// Optimized short prompt for faster LLM response
-export const WORD_VALIDATION_PROMPT = `Word association validator. r=true ONLY if there's a direct, immediate connection.
-ACCEPT: direct synonyms, immediate associations (bird/nest, dog/bark), inherent properties (fire/hot), compound words (bird/house=birdhouse), same category at any level (apple/orange, fungus/plant, cat/dog, mammal/reptile, car/truck).
-REJECT:
-- Multi-hop reasoning (A→B→C is NOT valid, only A→B)
-- Abstract thematic links
-- Connections requiring explanation
-- Proper nouns, misspellings
-When in doubt about category relationships, accept them.
-x codes: n=not_related, a=too_abstract, m=multi_hop, p=proper_noun, s=misspelled, i=invalid_word`;
+export const WORD_VALIDATION_PROMPT = `STRICT word association validator for a word chain game. r=false for weak connections.
+
+Both words must be REAL English dictionary words. Reject abbreviations, acronyms, slang, gibberish, or misspellings.
+
+Only accept connections that are logical and obvious. Ask yourself: "Would 8 out of 10 people instantly see this connection?"
+
+VALID connection types:
+- Direct synonyms/antonyms (happy/sad, big/large)
+- Immediate associations (coffee/cup, rain/umbrella, dog/bark)
+- Direct properties (fire/hot, ice/cold, brick/hard)
+- Clear part-whole (wheel/car, page/book)
+- Common collocations (hard/rain, birthday/cake)
+- Same SMALL category with few members (apple/orange - fruits, summer/fall - seasons, Monday/Tuesday - days)
+
+INVALID - REJECT these:
+- Sharing a broad category is NOT enough (brick/skyscraper - both "construction" is too vague)
+- Multi-hop reasoning (tree/leg requires: tree→wood→furniture→legs - REJECT)
+- Tenuous or "technically true" connections
+- Connections that require explanation or justification
+
+BE STRICT about weak/indirect connections, but DO NOT overthink obvious pairs. If the connection is immediately clear to most people (like drink/water, eat/food), accept it. Don't reject based on grammatical technicalities like "verb vs noun" — focus on whether the conceptual link is obvious.
+
+x codes: n=not_related, a=too_abstract, m=multi_hop, s=misspelled, i=invalid_word
+
+Examples:
+- fire,hot = Y
+- rain,umbrella = Y
+- brick,wall = Y
+- brick,skyscraper = N, x: a
+- tree,leg = N, x: m
+- computer,elephant = N, x: n`;
