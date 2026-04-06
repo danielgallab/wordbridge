@@ -34,34 +34,23 @@ RULES:
 
 Generate a unique and creative word pair. Surprise the player with unexpected words.`;
 
-export const WORD_VALIDATION_PROMPT = `STRICT word association validator for a word chain game. r=false for weak connections.
+export const WORD_VALIDATION_PROMPT = `Word association validator. r=false for weak/invalid connections.
 
-Both words must be REAL English dictionary words. Reject abbreviations, acronyms, slang, gibberish, or misspellings.
+Words must be real English dictionary words (no slang, acronyms, gibberish, misspellings).
 
-Only accept connections that are logical and obvious. Ask yourself: "Would 8 out of 10 people instantly see this connection?"
+ACCEPT if 8/10 people instantly see the connection. Valid types:
+- Synonyms/antonyms: happy/sad
+- Associations: coffee/cup, lantern/light, lock/key
+- Properties: fire/hot, grass/green
+- Part-whole: wheel/car, page/book
+- Collocations: birthday/cake
+- Small closed categories: apple/orange, Monday/Tuesday
 
-VALID connection types:
-- Direct synonyms/antonyms (happy/sad, big/large)
-- Immediate associations (coffee/cup, rain/umbrella, dog/bark)
-- Direct properties (fire/hot, ice/cold, brick/hard)
-- Clear part-whole (wheel/car, page/book)
-- Common collocations (hard/rain, birthday/cake)
-- Same SMALL category with few members (apple/orange - fruits, summer/fall - seasons, Monday/Tuesday - days)
-
-INVALID - REJECT these:
-- Sharing a broad category is NOT enough (brick/skyscraper - both "construction" is too vague)
-- Multi-hop reasoning (tree/leg requires: tree→wood→furniture→legs - REJECT)
-- Tenuous or "technically true" connections
-- Connections that require explanation or justification
-
-BE STRICT about weak/indirect connections, but DO NOT overthink obvious pairs. If the connection is immediately clear to most people (like drink/water, eat/food), accept it. Don't reject based on grammatical technicalities like "verb vs noun" — focus on whether the conceptual link is obvious.
+REJECT if:
+- Multi-hop reasoning required (tree→wood→furniture→leg)
+- Only broad category shared (brick/skyscraper → "construction")
+- Needs explanation to make sense
 
 x codes: n=not_related, a=too_abstract, m=multi_hop, s=misspelled, i=invalid_word
 
-Examples:
-- fire,hot = Y
-- rain,umbrella = Y
-- brick,wall = Y
-- brick,skyscraper = N, x: a
-- tree,leg = N, x: m
-- computer,elephant = N, x: n`;
+Ex: coffee,cup→r:1 fire,hot→r:1 hand,climb→r:1 tree,furniture→r:0,x:m brick,tower→r:0,x:a car,phone→r:0,x:n`;

@@ -32,13 +32,8 @@ const rejectionMap: Record<string, RejectionReason> = {
 };
 
 export async function POST(request: NextRequest) {
-  const totalStart = performance.now();
-  const timings: Record<string, number> = {};
-
   try {
-    let start = performance.now();
     const { word1, word2 } = await request.json();
-    timings['parseRequest'] = performance.now() - start;
 
     if (!word1 || !word2) {
       return NextResponse.json(
@@ -65,46 +60,59 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ isValid: false, cached: false, reason: 'invalid_word' });
     }
 
-    start = performance.now();
     const supabase = createServiceClient();
-    timings['createSupabaseClient'] = performance.now() - start;
 
-    // Check cache first (both directions)
-    start = performance.now();
-    const { data: cached } = await supabase
+    // Race cache check against OpenAI call - whichever finishes first wins
+    const abortController = new AbortController();
+    const openai = getOpenAI();
+
+    const cachePromise = supabase
       .from('word_associations')
       .select('is_valid, rejection_reason')
       .or(`and(word1.eq.${w1},word2.eq.${w2}),and(word1.eq.${w2},word2.eq.${w1})`)
       .limit(1)
-      .single();
-    timings['cacheCheck'] = performance.now() - start;
+      .single()
+      .then((result: { data: { is_valid: boolean; rejection_reason: RejectionReason | null } | null }) => ({
+        type: 'cache' as const,
+        data: result.data
+      }));
 
-    if (cached !== null) {
-      timings['total'] = performance.now() - totalStart;
-      console.log(`[Validate Word] "${w1}" <-> "${w2}" | CACHE HIT | Timings (ms):`, JSON.stringify(timings));
-      return NextResponse.json({
-        isValid: cached.is_valid,
-        cached: true,
-        reason: cached.rejection_reason || (cached.is_valid ? undefined : 'not_related'),
-      });
-    }
-
-    // Call OpenAI gpt-5.4-mini with structured output (optimized for speed)
-    start = performance.now();
-    const openai = getOpenAI();
-    timings['getOpenAIClient'] = performance.now() - start;
-
-    start = performance.now();
-    const response = await openai.chat.completions.create({
+    const openaiPromise = openai.chat.completions.create({
       model: 'gpt-5.4-mini',
       messages: [
         { role: 'system', content: WORD_VALIDATION_PROMPT },
         { role: 'user', content: `${w1},${w2}` },
       ],
       response_format: zodResponseFormat(WordAssociationResult, 'word_association'),
-      max_completion_tokens: 50, // Minimal response needed
-    });
-    timings['openaiCall'] = performance.now() - start;
+      max_completion_tokens: 20,
+      temperature: 0,
+    }, {
+      signal: abortController.signal,
+    }).then(response => ({ type: 'openai' as const, data: response }))
+      .catch(err => {
+        // If aborted, return null - we'll handle this in the race result
+        if (err.name === 'AbortError') return null;
+        throw err;
+      });
+
+    // Race: whoever finishes first wins
+    const result = await Promise.race([cachePromise, openaiPromise]);
+
+    if (result && result.type === 'cache' && result.data !== null) {
+      abortController.abort(); // Cancel OpenAI request
+      return NextResponse.json({
+        isValid: result.data.is_valid,
+        cached: true,
+        reason: result.data.rejection_reason || (result.data.is_valid ? undefined : 'not_related'),
+      });
+    }
+
+    // Either cache was null or OpenAI finished first - ensure we have OpenAI response
+    const response = (result && result.type === 'openai') ? result.data : await openaiPromise.then(r => r?.data);
+
+    if (!response) {
+      throw new Error('Failed to get OpenAI response');
+    }
 
     const content = response.choices[0]?.message?.content;
     let isValid = false;
@@ -114,7 +122,6 @@ export async function POST(request: NextRequest) {
         const parsed = JSON.parse(content);
         isValid = parsed.r === true;
         rejectionReason = parsed.x ? rejectionMap[parsed.x] : undefined;
-        console.log(`[Word Validation] "${w1}" <-> "${w2}": ${isValid ? 'VALID' : 'INVALID'} | Rejection: ${rejectionReason || 'none'}`);
       } catch {
         isValid = false;
         rejectionReason = 'invalid_word';
@@ -122,20 +129,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Cache the result (including rejection reason)
-    start = performance.now();
-    const { error: insertError } = await supabase.from('word_associations').insert({
+    await supabase.from('word_associations').insert({
       word1: w1,
       word2: w2,
       is_valid: isValid,
       rejection_reason: rejectionReason,
     });
-    timings['cacheInsert'] = performance.now() - start;
-    if (insertError) {
-      console.error(`[Cache Insert Error] "${w1}" <-> "${w2}":`, insertError.message);
-    }
-
-    timings['total'] = performance.now() - totalStart;
-    console.log(`[Validate Word] "${w1}" <-> "${w2}" | CACHE MISS | Timings (ms):`, JSON.stringify(timings));
 
     return NextResponse.json({
       isValid,
