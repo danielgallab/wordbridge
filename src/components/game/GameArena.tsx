@@ -9,6 +9,7 @@ import { CompactPlayerPanel } from './CompactPlayerPanel';
 import { useGameStore } from '@/stores/gameStore';
 import { useGameRoom } from '@/hooks/useGameRoom';
 import { calculatePathQuality } from '@/lib/scoring';
+import { useSoundEffects } from '@/hooks/useSoundEffects';
 
 const TOTAL_TIME = 90;
 
@@ -49,6 +50,36 @@ export function GameArena() {
   const [showRematchUI, setShowRematchUI] = useState(false);
   const [shareStatus, setShareStatus] = useState<'idle' | 'copied'>('idle');
   const [gameOverKey, setGameOverKey] = useState(0);
+  const [prevChainLength, setPrevChainLength] = useState(myChain.length);
+
+  // Sound effects
+  const { play: playSound } = useSoundEffects();
+
+  // Play sound on successful word submission
+  useEffect(() => {
+    if (myChain.length > prevChainLength) {
+      playSound('success');
+    }
+    setPrevChainLength(myChain.length);
+  }, [myChain.length, prevChainLength, playSound]);
+
+  // Play sound on error
+  useEffect(() => {
+    if (error) {
+      playSound('error');
+    }
+  }, [error, playSound]);
+
+  // Play sound on game end
+  useEffect(() => {
+    if (showGameOver) {
+      if (didIWin) {
+        playSound('win');
+      } else if (!isDraw) {
+        playSound('lose');
+      }
+    }
+  }, [showGameOver, didIWin, isDraw, playSound]);
 
   // Reset showRematchUI when game over state changes
   useEffect(() => {

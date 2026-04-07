@@ -1,144 +1,286 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { getOpenAI, WORD_PAIR_GENERATION_PROMPT } from '@/lib/openai';
+import { WORD_BANK, getWordBankSize } from './wordBank';
+import { getOpenAI } from '@/lib/openai';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import { z } from 'zod';
 
-const WordPairResult = z.object({
-  start_word: z.string(),
-  target_word: z.string(),
-  reasoning: z.string(),
-});
-
 export type Difficulty = 'easy' | 'medium' | 'hard';
 
-export async function getRecentlyUsedWords(supabase: SupabaseClient): Promise<string[]> {
-  const threeDaysAgo = new Date();
-  threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+// Schema for AI-generated words to add to the bank
+const NewWordsResult = z.object({
+  words: z.array(z.string()),
+});
+
+// In-memory cache of AI-added words (loaded from DB on first request)
+let aiWordsCache: Set<string> | null = null;
+
+/**
+ * Load AI-added words from the database
+ */
+async function loadAIWordsFromDB(supabase: SupabaseClient): Promise<Set<string>> {
+  if (aiWordsCache !== null) {
+    return aiWordsCache;
+  }
+
+  const { data: words } = await supabase
+    .from('word_bank')
+    .select('word')
+    .eq('source', 'ai');
+
+  aiWordsCache = new Set<string>();
+  if (words) {
+    for (const row of words) {
+      aiWordsCache.add(row.word);
+    }
+  }
+
+  console.log(`[Word Bank] Loaded ${aiWordsCache.size} AI-added words from database`);
+  return aiWordsCache;
+}
+
+/**
+ * Save a new AI-generated word to the database
+ */
+async function saveWordToDB(supabase: SupabaseClient, word: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('word_bank')
+    .insert({ word: word.toLowerCase(), source: 'ai' });
+
+  if (error) {
+    // Likely a duplicate, ignore
+    if (error.code === '23505') return false;
+    console.error('[Word Bank] Failed to save word:', error);
+    return false;
+  }
+
+  // Update the cache
+  if (aiWordsCache) {
+    aiWordsCache.add(word.toLowerCase());
+  }
+
+  return true;
+}
+
+/**
+ * Get the full word pool (static bank + AI-added words from DB)
+ */
+async function getWordPool(supabase: SupabaseClient): Promise<string[]> {
+  const aiWords = await loadAIWordsFromDB(supabase);
+  return [...WORD_BANK, ...Array.from(aiWords)];
+}
+
+/**
+ * Get recently used word pairs from the database (last 24 hours)
+ */
+async function getRecentlyUsedPairs(supabase: SupabaseClient): Promise<Set<string>> {
+  const oneDayAgo = new Date();
+  oneDayAgo.setDate(oneDayAgo.getDate() - 1);
 
   const { data: recentPairs } = await supabase
     .from('word_pairs')
     .select('start_word, target_word')
-    .gte('last_used_at', threeDaysAgo.toISOString())
-    .limit(50);
+    .gte('last_used_at', oneDayAgo.toISOString())
+    .limit(200);
 
-  if (!recentPairs) return [];
-
-  const words = new Set<string>();
-  for (const pair of recentPairs) {
-    words.add(pair.start_word);
-    words.add(pair.target_word);
+  const pairSet = new Set<string>();
+  if (recentPairs) {
+    for (const pair of recentPairs) {
+      // Store both directions to avoid "cat→dog" and "dog→cat" in same day
+      pairSet.add(`${pair.start_word}:${pair.target_word}`);
+      pairSet.add(`${pair.target_word}:${pair.start_word}`);
+    }
   }
-  return Array.from(words);
-}
-
-async function getCachedWordPair(supabase: SupabaseClient, difficulty: Difficulty, recentWords: string[]): Promise<{ start_word: string; target_word: string } | null> {
-  const oneDayAgo = new Date();
-  oneDayAgo.setDate(oneDayAgo.getDate() - 1);
-
-  // Build query to find a cached pair that hasn't been used recently
-  const query = supabase
-    .from('word_pairs')
-    .select('id, start_word, target_word, used_count')
-    .eq('difficulty', difficulty)
-    .or(`last_used_at.is.null,last_used_at.lt.${oneDayAgo.toISOString()}`)
-    .order('used_count', { ascending: true })
-    .order('last_used_at', { ascending: true, nullsFirst: true })
-    .limit(10);
-
-  const { data: candidates } = await query;
-
-  if (!candidates || candidates.length === 0) return null;
-
-  // Filter out pairs that contain recently used words
-  const recentWordsSet = new Set(recentWords);
-  const validPair = candidates.find(
-    pair => !recentWordsSet.has(pair.start_word) && !recentWordsSet.has(pair.target_word)
-  );
-
-  if (!validPair) return null;
-
-  // Update usage stats
-  await supabase
-    .from('word_pairs')
-    .update({
-      used_count: (validPair.used_count || 0) + 1,
-      last_used_at: new Date().toISOString(),
-    })
-    .eq('id', validPair.id);
-
-  console.log(`[Word Pair Cache Hit] ${validPair.start_word} → ${validPair.target_word} (${difficulty})`);
-
-  return { start_word: validPair.start_word, target_word: validPair.target_word };
-}
-
-async function storeWordPair(supabase: SupabaseClient, startWord: string, targetWord: string, difficulty: Difficulty, reasoning: string): Promise<void> {
-  const { data, error } = await supabase
-    .from('word_pairs')
-    .insert({
-      start_word: startWord,
-      target_word: targetWord,
-      difficulty,
-      reasoning,
-      used_count: 1,
-      last_used_at: new Date().toISOString(),
-    })
-    .select();
-
-  if (error) {
-    console.error('Failed to cache word pair:', error);
-  } else {
-    console.log(`[Word Pair Cached] ${startWord} → ${targetWord} (${difficulty})`, data);
-  }
-}
-
-async function generateWordPairFromAI(supabase: SupabaseClient, difficulty: Difficulty, recentWords: string[]) {
-  const openai = getOpenAI();
-
-  let avoidClause = '';
-  if (recentWords.length > 0) {
-    avoidClause = ` Do NOT use any of these recently used words: ${recentWords.join(', ')}.`;
-  }
-
-  const response = await openai.chat.completions.create({
-    model: 'gpt-5.4-mini',
-    temperature: 1.2,
-    seed: Math.floor(Math.random() * 1000000),
-    messages: [
-      { role: 'system', content: WORD_PAIR_GENERATION_PROMPT },
-      { role: 'user', content: `Generate a ${difficulty} difficulty word pair.${avoidClause}` },
-    ],
-    response_format: zodResponseFormat(WordPairResult, 'word_pair'),
-  });
-
-  const content = response.choices[0]?.message?.content;
-  if (!content) {
-    throw new Error('Failed to generate word pair');
-  }
-
-  const parsed = JSON.parse(content);
-  const startWord = parsed.start_word.toLowerCase().trim();
-  const targetWord = parsed.target_word.toLowerCase().trim();
-
-  console.log(`[Word Pair Generated] ${startWord} → ${targetWord} (${difficulty}) | Reasoning: ${parsed.reasoning}`);
-
-  // Cache the newly generated pair
-  await storeWordPair(supabase, startWord, targetWord, difficulty, parsed.reasoning);
-
-  return { start_word: startWord, target_word: targetWord };
+  return pairSet;
 }
 
 /**
- * Get a word pair for a game - checks cache first, generates new one if needed.
+ * Record a used pair in the database
  */
-export async function generateWordPair(supabase: SupabaseClient, difficulty: Difficulty = 'medium') {
-  const recentWords = await getRecentlyUsedWords(supabase);
+async function recordUsedPair(
+  supabase: SupabaseClient,
+  startWord: string,
+  targetWord: string,
+  difficulty: Difficulty
+): Promise<void> {
+  // Try to update existing pair
+  const { data: existing } = await supabase
+    .from('word_pairs')
+    .select('id, used_count')
+    .eq('start_word', startWord)
+    .eq('target_word', targetWord)
+    .single();
 
-  // Try to get a cached word pair first
-  const cachedPair = await getCachedWordPair(supabase, difficulty, recentWords);
-  if (cachedPair) {
-    return cachedPair;
+  if (existing) {
+    await supabase
+      .from('word_pairs')
+      .update({
+        used_count: (existing.used_count || 0) + 1,
+        last_used_at: new Date().toISOString(),
+      })
+      .eq('id', existing.id);
+  } else {
+    // Insert new pair record
+    await supabase.from('word_pairs').insert({
+      start_word: startWord,
+      target_word: targetWord,
+      difficulty,
+      used_count: 1,
+      last_used_at: new Date().toISOString(),
+    });
+  }
+}
+
+/**
+ * Select two random words from the pool that haven't been used as a pair recently
+ */
+function selectRandomPair(
+  wordPool: string[],
+  recentPairs: Set<string>,
+  maxAttempts: number = 50
+): { startWord: string; targetWord: string } | null {
+  for (let i = 0; i < maxAttempts; i++) {
+    const startIndex = Math.floor(Math.random() * wordPool.length);
+    let targetIndex = Math.floor(Math.random() * wordPool.length);
+
+    // Ensure different words
+    while (targetIndex === startIndex) {
+      targetIndex = Math.floor(Math.random() * wordPool.length);
+    }
+
+    const startWord = wordPool[startIndex];
+    const targetWord = wordPool[targetIndex];
+    const pairKey = `${startWord}:${targetWord}`;
+
+    // Check if this pair was used recently
+    if (!recentPairs.has(pairKey)) {
+      return { startWord, targetWord };
+    }
   }
 
-  // No suitable cached pair found, generate a new one
-  return generateWordPairFromAI(supabase, difficulty, recentWords);
+  // If we couldn't find an unused pair after maxAttempts, just return any pair
+  // This is a fallback and should rarely happen with a large word bank
+  const startIndex = Math.floor(Math.random() * wordPool.length);
+  let targetIndex = Math.floor(Math.random() * wordPool.length);
+  while (targetIndex === startIndex) {
+    targetIndex = Math.floor(Math.random() * wordPool.length);
+  }
+
+  return {
+    startWord: wordPool[startIndex],
+    targetWord: wordPool[targetIndex],
+  };
+}
+
+/**
+ * Use AI to generate new words to add to the bank
+ * Called periodically to expand variety
+ */
+async function expandWordBank(
+  supabase: SupabaseClient,
+  existingWords: string[]
+): Promise<number> {
+  const openai = getOpenAI();
+
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [
+      {
+        role: 'system',
+        content: `You are a word generator for a word association game. Generate 20 new common English nouns that would be good for word chain games.
+
+RULES:
+1. Only common, single-word English nouns
+2. No proper nouns, no obscure words
+3. Words should have many possible associations
+4. Avoid words that are too similar to each other
+5. Mix different categories: nature, objects, food, animals, places, etc.
+
+Return ONLY words that are NOT in this existing list: ${existingWords.slice(0, 200).join(', ')}`,
+      },
+      {
+        role: 'user',
+        content: 'Generate 20 new words for the word bank.',
+      },
+    ],
+    response_format: zodResponseFormat(NewWordsResult, 'new_words'),
+  });
+
+  const content = response.choices[0]?.message?.content;
+  if (!content) return 0;
+
+  const parsed = JSON.parse(content);
+  const newWords: string[] = parsed.words.map((w: string) => w.toLowerCase().trim());
+
+  // Save each word to the database
+  let addedCount = 0;
+  for (const word of newWords) {
+    const saved = await saveWordToDB(supabase, word);
+    if (saved) addedCount++;
+  }
+
+  return addedCount;
+}
+
+/**
+ * Get a word pair for a game.
+ * Uses the static word bank with random selection.
+ * Tracks recently used pairs to avoid repetition.
+ */
+export async function generateWordPair(
+  supabase: SupabaseClient,
+  difficulty: Difficulty = 'medium'
+) {
+  // Get recently used pairs to avoid
+  const recentPairs = await getRecentlyUsedPairs(supabase);
+
+  // Get the full word pool (static + AI words from DB)
+  let wordPool = await getWordPool(supabase);
+
+  // If we've used a lot of pairs recently, expand the bank with AI
+  // This happens when recentPairs is > 30% of possible combinations
+  const possiblePairs = wordPool.length * (wordPool.length - 1);
+  const aiWordsCount = aiWordsCache?.size || 0;
+
+  if (recentPairs.size > possiblePairs * 0.3 && aiWordsCount < 500) {
+    console.log('[Word Bank] Expanding word bank with AI...');
+    try {
+      const addedCount = await expandWordBank(supabase, wordPool);
+      if (addedCount > 0) {
+        wordPool = await getWordPool(supabase);
+        console.log(`[Word Bank] Added ${addedCount} new words. Total pool: ${wordPool.length}`);
+      }
+    } catch (error) {
+      console.error('[Word Bank] Failed to expand word bank:', error);
+    }
+  }
+
+  // Select a random pair that hasn't been used recently
+  const pair = selectRandomPair(wordPool, recentPairs);
+
+  if (!pair) {
+    // Absolute fallback - should never happen
+    throw new Error('Failed to select word pair');
+  }
+
+  // Record the usage
+  await recordUsedPair(supabase, pair.startWord, pair.targetWord, difficulty);
+
+  console.log(`[Word Pair] ${pair.startWord} → ${pair.targetWord} (${difficulty}) [Pool: ${wordPool.length} words]`);
+
+  return {
+    start_word: pair.startWord,
+    target_word: pair.targetWord,
+  };
+}
+
+/**
+ * Get stats about the word bank
+ */
+export async function getWordBankStats(supabase: SupabaseClient) {
+  const aiWords = await loadAIWordsFromDB(supabase);
+  return {
+    staticWords: getWordBankSize(),
+    aiAddedWords: aiWords.size,
+    totalWords: getWordBankSize() + aiWords.size,
+  };
 }

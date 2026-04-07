@@ -70,17 +70,18 @@ export async function POST(request: NextRequest) {
 
     // Check cache for both the original word2 and a potential singular form
     // We use client-side singularize as a hint for cache lookup only
+    // NOTE: We also check reversed order for validity, but we need to track which direction matched
     const w2Singular = singularize(w2);
     const cachePromise = supabase
       .from('word_associations')
-      .select('is_valid, rejection_reason, word2')
+      .select('is_valid, rejection_reason, word1, word2')
       .or(
         `and(word1.eq.${w1},word2.eq.${w2}),and(word1.eq.${w2},word2.eq.${w1}),` +
         `and(word1.eq.${w1},word2.eq.${w2Singular}),and(word1.eq.${w2Singular},word2.eq.${w1})`
       )
       .limit(1)
       .single()
-      .then((result: { data: { is_valid: boolean; rejection_reason: RejectionReason | null; word2: string } | null }) => ({
+      .then((result: { data: { is_valid: boolean; rejection_reason: RejectionReason | null; word1: string; word2: string } | null }) => ({
         type: 'cache' as const,
         data: result.data
       }));
@@ -108,8 +109,13 @@ export async function POST(request: NextRequest) {
 
     if (result && result.type === 'cache' && result.data !== null) {
       abortController.abort(); // Cancel OpenAI request
-      // Return the cached word2 as normalizedWord if it differs from input
-      const normalizedWord = result.data.word2 !== w2 ? result.data.word2 : undefined;
+      // Only return normalizedWord if the cache hit was in the forward direction (word1=w1)
+      // and word2 is a singular form of our input w2 (not the reversed lookup)
+      let normalizedWord: string | undefined;
+      if (result.data.word1 === w1 && result.data.word2 !== w2) {
+        // Forward direction cache hit with a different word2 (e.g., singular form)
+        normalizedWord = result.data.word2;
+      }
       return NextResponse.json({
         isValid: result.data.is_valid,
         cached: true,

@@ -10,6 +10,12 @@ const description =
 export const metadata: Metadata = {
   title,
   description,
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title,
+  },
   openGraph: {
     title,
     description,

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 
 interface WordInputProps {
   onSubmit: (word: string) => void;
@@ -12,18 +12,35 @@ interface WordInputProps {
 export function WordInput({ onSubmit, disabled, isValidating, error }: WordInputProps) {
   const [value, setValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const lastSubmitRef = useRef<number>(0);
+  const DEBOUNCE_MS = 300; // Prevent rapid submissions
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
 
-  const handleSubmit = () => {
+  // Re-focus input after validation completes (for rapid play)
+  useEffect(() => {
+    if (!isValidating && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isValidating]);
+
+  const handleSubmit = useCallback(() => {
     const trimmed = value.trim().toLowerCase();
+    const now = Date.now();
+
+    // Debounce: prevent rapid submissions
+    if (now - lastSubmitRef.current < DEBOUNCE_MS) {
+      return;
+    }
+
     if (trimmed && !disabled && !isValidating) {
+      lastSubmitRef.current = now;
       setValue('');
       onSubmit(trimmed);
     }
-  };
+  }, [value, disabled, isValidating, onSubmit]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -39,7 +56,7 @@ export function WordInput({ onSubmit, disabled, isValidating, error }: WordInput
   };
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2" role="form" aria-label="Word submission">
       <div className="flex gap-2">
         <input
           ref={inputRef}
@@ -52,6 +69,12 @@ export function WordInput({ onSubmit, disabled, isValidating, error }: WordInput
           readOnly={isValidating}
           maxLength={20}
           autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck="false"
+          enterKeyHint="send"
+          aria-label="Enter your next word"
+          aria-invalid={!!error}
+          aria-describedby={error ? 'word-input-error' : undefined}
           autoFocus
           className={`
             flex-1 px-3 sm:px-4 py-2.5 sm:py-3 rounded-md text-base
@@ -67,6 +90,7 @@ export function WordInput({ onSubmit, disabled, isValidating, error }: WordInput
         <button
           onClick={handleSubmit}
           disabled={disabled || isValidating || !value.trim()}
+          aria-label="Submit word"
           className={`
             px-4 sm:px-6 py-2.5 sm:py-3 rounded-md font-bold
             bg-[var(--correct)] text-white
@@ -78,7 +102,12 @@ export function WordInput({ onSubmit, disabled, isValidating, error }: WordInput
         </button>
       </div>
       {error && (
-        <p className="text-sm text-[var(--error)] animate-[shake_0.3s_ease]">
+        <p
+          id="word-input-error"
+          role="alert"
+          aria-live="assertive"
+          className="text-sm text-[var(--error)] animate-[shake_0.3s_ease]"
+        >
           {error}
         </p>
       )}

@@ -8,9 +8,13 @@ import { WordInput } from '@/components/game/WordInput';
 import { ChainDisplay } from '@/components/game/ChainDisplay';
 import { PracticeCompletionModal } from './PracticeCompletionModal';
 import { calculatePathQuality } from '@/lib/scoring';
+import { useSoundEffects } from '@/hooks/useSoundEffects';
 
 export function PracticeMode() {
   const initialized = useRef(false);
+  const prevChainLengthRef = useRef(0);
+  const prevErrorRef = useRef<string | null>(null);
+  const { play: playSound } = useSoundEffects();
   const {
     puzzle,
     chain,
@@ -29,6 +33,27 @@ export function PracticeMode() {
     initialized.current = true;
     loadNewPuzzle();
   }, [loadNewPuzzle]);
+
+  // Play sound effects on chain changes and errors
+  useEffect(() => {
+    // Play success sound when chain grows
+    if (chain.length > prevChainLengthRef.current && prevChainLengthRef.current > 0) {
+      if (isComplete) {
+        playSound('win');
+      } else {
+        playSound('success');
+      }
+    }
+    prevChainLengthRef.current = chain.length;
+  }, [chain.length, isComplete, playSound]);
+
+  useEffect(() => {
+    // Play error sound when error appears
+    if (error && error !== prevErrorRef.current) {
+      playSound('error');
+    }
+    prevErrorRef.current = error;
+  }, [error, playSound]);
 
   const handleSubmitWord = useCallback(
     async (word: string) => {

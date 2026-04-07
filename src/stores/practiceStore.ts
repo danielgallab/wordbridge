@@ -11,14 +11,14 @@ export type RejectionReason =
   | 'misspelled';
 
 const REJECTION_MESSAGES: Record<RejectionReason, string> = {
-  not_related: 'Not related enough',
-  already_used: 'Already used',
-  invalid_word: 'Not a valid word',
-  same_as_previous: 'Same as previous word',
-  too_abstract: 'Connection too abstract',
-  proper_noun: 'Proper nouns not allowed',
-  multi_hop: 'Needs intermediate steps',
-  misspelled: 'Check your spelling',
+  not_related: 'Not related enough — try a more direct connection',
+  already_used: 'Already used — each word can only appear once',
+  invalid_word: 'Not a valid word — try a common English word',
+  same_as_previous: 'Same as previous — use a different word',
+  too_abstract: 'Too abstract — try something more concrete',
+  proper_noun: 'No proper nouns — use common words only',
+  multi_hop: 'Too far apart — add a word in between',
+  misspelled: 'Check spelling — did you mean something else?',
 };
 
 interface PracticeState {
