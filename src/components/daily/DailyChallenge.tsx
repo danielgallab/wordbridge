@@ -146,23 +146,23 @@ export function DailyChallenge({ initialData }: DailyChallengeProps) {
       </div>
 
       {/* Multiplayer CTA */}
-      <div className="mt-6">
-        <div className="flex items-center gap-3 mb-4">
+      <div className="mt-4 opacity-40 hover:opacity-100 transition-opacity duration-300">
+        <div className="flex items-center gap-3 mb-3">
           <div className="flex-1 h-px bg-[var(--border)]" />
-          <span className="text-xs text-[var(--text-muted)] uppercase">or play with friends</span>
+          <span className="text-xs text-[var(--text-muted)] uppercase tracking-wide">or play with friends</span>
           <div className="flex-1 h-px bg-[var(--border)]" />
         </div>
         <div className="flex gap-2">
           <Link
             href="/multiplayer?action=create"
-            className="flex-1 py-3 rounded-md bg-[var(--correct)] text-white font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+            className="flex-1 py-2.5 rounded-md border border-[var(--border)] text-[var(--text-muted)] text-sm font-medium hover:border-[var(--correct)] hover:text-[var(--correct)] transition-colors flex items-center justify-center gap-2"
           >
             <Plus className="w-4 h-4" />
             Create Room
           </Link>
           <Link
             href="/multiplayer?action=join"
-            className="flex-1 py-3 rounded-md bg-[var(--present)] text-white font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+            className="flex-1 py-2.5 rounded-md border border-[var(--border)] text-[var(--text-muted)] text-sm font-medium hover:border-[var(--present)] hover:text-[var(--present)] transition-colors flex items-center justify-center gap-2"
           >
             <LogIn className="w-4 h-4" />
             Join Room
