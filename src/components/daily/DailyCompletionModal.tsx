@@ -39,13 +39,11 @@ export function DailyCompletionModal({
   });
 
   const handleShare = async () => {
-    // Create chain visualization: links for each letter of middle words
-    const middleWords = chain.slice(1, -1); // Exclude start and end words
-    const chainViz = middleWords.map((word) => '🔗'.repeat(word.length)).join(' → ');
+    const chains = '⛓️'.repeat(wordCount);
 
     const shareText =
       `WordBridge Daily #${puzzleNumber}\n\n` +
-      `${puzzle.start_word.toUpperCase()} → ${chainViz} → ${puzzle.target_word.toUpperCase()} ${pathQuality?.emoji || ''}\n\n` +
+      `${puzzle.start_word.toUpperCase()} ${chains} ${puzzle.target_word.toUpperCase()} ${pathQuality?.emoji || ''}\n\n` +
       `I solved it in ${wordCount} words. Can you beat that?\n\n` +
       `https://wordbridge.danielgallab.com`;
 

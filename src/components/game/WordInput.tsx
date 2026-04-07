@@ -32,12 +32,6 @@ export function WordInput({ onSubmit, disabled, isValidating, error }: WordInput
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Don't transform the value - let mobile keyboards work naturally
-    // The value is normalized to lowercase on submit, and CSS displays it uppercase
-    setValue(e.target.value);
-  };
-
   return (
     <div className="flex flex-col gap-2">
       <div className="flex gap-2">
@@ -45,7 +39,6 @@ export function WordInput({ onSubmit, disabled, isValidating, error }: WordInput
           ref={inputRef}
           type="text"
           value={value}
-          onChange={handleChange}
           onKeyDown={handleKeyDown}
           placeholder="Type next word..."
           disabled={disabled}
