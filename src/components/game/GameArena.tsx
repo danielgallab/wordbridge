@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Upload, Trophy, Skull, Handshake } from 'lucide-react';
 import { Timer } from './Timer';
 import { PlayerPanel } from './PlayerPanel';
+import { CompactPlayerPanel } from './CompactPlayerPanel';
 import { useGameStore } from '@/stores/gameStore';
 import { useGameRoom } from '@/hooks/useGameRoom';
 import { calculatePathQuality } from '@/lib/scoring';
@@ -18,8 +19,6 @@ export function GameArena() {
     room,
     playerId,
     myChain,
-    opponentChain,
-    opponentChainLength,
     timeLeft,
     rematchStatus,
     winner,
@@ -33,11 +32,12 @@ export function GameArena() {
     reset,
   } = useGameStore();
 
-  const { opponent, isWaiting, isPlaying, isFinished } = useGameRoom(room?.id || null);
+  const { otherPlayers, myPlayer, isWaiting, isPlaying, isFinished } = useGameRoom(room?.id || null);
 
-  const myPlayer = players.find(p => p.id === playerId);
   const myName = myPlayer?.player_name || 'You';
-  const opponentName = opponent?.player_name || 'Opponent';
+  const winnerPlayer = players.find(p => p.id === winner);
+  const didIWin = winner === playerId;
+  const isDraw = winner === null && isFinished;
 
   // Derive rematch state from rematchStatus
   const wantsRematch = rematchStatus === 'requested';
@@ -249,75 +249,82 @@ export function GameArena() {
       </div>
 
       {/* Arena */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative">
+      <div className="space-y-4">
+        {/* Your Panel - Full Size */}
         <PlayerPanel
           name={myName}
           chain={myChain}
           targetWord={room.target_word}
           isYou
-          isWinner={winner === 'me'}
+          isWinner={didIWin}
           showInput={isPlaying}
           onSubmitWord={handleSubmitWord}
           isValidating={isValidating}
           error={error}
         />
 
-        {/* VS Divider - hidden on mobile since panels stack */}
-        <div className="hidden md:block absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
-          <div className="w-10 h-10 rounded-full bg-[var(--background)] border-2 border-[var(--border)] flex items-center justify-center font-bold text-[var(--text-muted)]">
-            VS
+        {/* Other Players Grid - Compact */}
+        {otherPlayers.length > 0 && (
+          <div>
+            <h3 className="text-xs uppercase text-[var(--text-muted)] font-bold mb-2 px-1">
+              Other Players ({otherPlayers.length})
+            </h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+              {otherPlayers.map((player) => (
+                <CompactPlayerPanel
+                  key={player.id}
+                  name={player.player_name}
+                  chain={player.chain}
+                  isWinner={winner === player.id}
+                  showFullChain={isFinished}
+                />
+              ))}
+            </div>
           </div>
-        </div>
-
-        <PlayerPanel
-          name={opponentName}
-          chain={opponentChain}
-          targetWord={room.target_word}
-          isWinner={winner === 'opponent'}
-          chainLength={opponentChainLength}
-          showChainLengthOnly={!isFinished}
-        />
+        )}
       </div>
 
       {/* Game Over Overlay */}
       {showGameOver && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-          <div className="bg-[var(--background)] border-2 border-[var(--border)] rounded-xl p-4 sm:p-8 text-center max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-[var(--background)] border-2 border-[var(--border)] rounded-xl p-4 sm:p-8 text-center max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="text-4xl sm:text-5xl mb-3 sm:mb-4 flex justify-center">
-              {winner === 'me' ? (
+              {didIWin ? (
                 <Trophy className="w-12 h-12 sm:w-14 sm:h-14 text-[var(--correct)]" />
-              ) : winner === 'opponent' ? (
-                <Skull className="w-12 h-12 sm:w-14 sm:h-14 text-[var(--error)]" />
-              ) : (
+              ) : isDraw ? (
                 <Handshake className="w-12 h-12 sm:w-14 sm:h-14 text-[var(--present)]" />
+              ) : (
+                <Skull className="w-12 h-12 sm:w-14 sm:h-14 text-[var(--error)]" />
               )}
             </div>
             <h2
               className={`text-xl sm:text-2xl font-bold mb-2 ${
-                winner === 'me'
+                didIWin
                   ? 'text-[var(--correct)]'
-                  : winner === 'opponent'
-                  ? 'text-[var(--error)]'
-                  : 'text-[var(--present)]'
+                  : isDraw
+                  ? 'text-[var(--present)]'
+                  : 'text-[var(--error)]'
               }`}
             >
-              {winner === 'me' ? 'You Win!' : winner === 'opponent' ? `${opponentName} Wins` : 'Draw!'}
+              {didIWin ? 'You Win!' : isDraw ? 'Draw!' : `${winnerPlayer?.player_name || 'Someone'} Wins!`}
             </h2>
 
             {/* Path quality rating */}
-            {pathQuality && winner === 'me' && (
+            {pathQuality && didIWin && (
               <div className="mb-3">
                 <span className="text-2xl">{pathQuality.emoji}</span>
                 <p className="text-sm text-[var(--text-muted)]">{pathQuality.description}</p>
               </div>
             )}
 
-            {/* Side-by-side chain comparison */}
-            <div className="grid grid-cols-2 gap-2 mb-4">
+            {/* All players chain comparison */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
+              {/* Your chain first */}
               {myChain.length > 1 && (
-                <div className="bg-[var(--surface)] rounded-lg p-2 sm:p-3 text-left">
-                  <div className="text-xs uppercase text-[var(--text-muted)] mb-1 font-bold">
-                    You ({myChain.length - 1} steps)
+                <div className={`bg-[var(--surface)] rounded-lg p-2 sm:p-3 text-left ${didIWin ? 'border-2 border-[var(--correct)]' : ''}`}>
+                  <div className="text-xs uppercase text-[var(--text-muted)] mb-1 font-bold flex items-center justify-between">
+                    <span>You ({myChain.length - 1} steps)</span>
+                    {didIWin && <Trophy className="w-3 h-3 text-[var(--correct)]" />}
                   </div>
                   <div className="font-mono text-xs text-[var(--present)] break-words">
                     {myChain.join(' → ')}
@@ -325,16 +332,27 @@ export function GameArena() {
                 </div>
               )}
 
-              {opponentChain.length > 1 && (
-                <div className="bg-[var(--surface)] rounded-lg p-2 sm:p-3 text-left">
-                  <div className="text-xs uppercase text-[var(--text-muted)] mb-1 font-bold">
-                    {opponentName} ({opponentChain.length - 1} steps)
+              {/* Other players chains */}
+              {otherPlayers.map((player) => {
+                const playerChain = player.chain;
+                if (!playerChain || playerChain.length <= 1) return null;
+                const isPlayerWinner = winner === player.id;
+
+                return (
+                  <div
+                    key={player.id}
+                    className={`bg-[var(--surface)] rounded-lg p-2 sm:p-3 text-left ${isPlayerWinner ? 'border-2 border-[var(--correct)]' : ''}`}
+                  >
+                    <div className="text-xs uppercase text-[var(--text-muted)] mb-1 font-bold flex items-center justify-between">
+                      <span>{player.player_name} ({playerChain.length - 1} steps)</span>
+                      {isPlayerWinner && <Trophy className="w-3 h-3 text-[var(--correct)]" />}
+                    </div>
+                    <div className="font-mono text-xs text-[var(--text-muted)] break-words">
+                      {playerChain.join(' → ')}
+                    </div>
                   </div>
-                  <div className="font-mono text-xs text-[var(--text-muted)] break-words">
-                    {opponentChain.join(' → ')}
-                  </div>
-                </div>
-              )}
+                );
+              })}
             </div>
 
             {/* Share button */}
@@ -355,7 +373,7 @@ export function GameArena() {
                       <>Starting rematch...</>
                     ) : (
                       <>
-                        Waiting for {opponentName}
+                        Waiting for other players
                         <span className="flex gap-1">
                           <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: '0ms' }} />
                           <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -369,7 +387,7 @@ export function GameArena() {
                     onClick={requestRematch}
                     className="w-full py-3 rounded-md bg-[var(--correct)] text-white font-bold hover:opacity-90 transition-opacity mb-3"
                   >
-                    {opponentWantsRematch ? `${opponentName} wants a rematch!` : 'Play Again'}
+                    {opponentWantsRematch ? 'Others want a rematch!' : 'Play Again'}
                   </button>
                 )}
               </>

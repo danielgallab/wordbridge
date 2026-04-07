@@ -62,13 +62,11 @@ interface GameState {
 
   // Game state
   myChain: string[];
-  opponentChainLength: number; // Only track length during play
-  opponentChain: string[]; // Full chain revealed at game end
   timeLeft: number;
   gameStartedAt: string | null; // Server timestamp for synchronized timer
   rematchStatus: RematchStatus;
   localGameEnded: boolean; // Tracks if we've locally ended the game (before server confirms)
-  winner: 'me' | 'opponent' | 'draw' | null;
+  winner: string | null; // Winner player ID, null for draw
   error: string | null;
   isValidating: boolean;
 
@@ -97,8 +95,6 @@ export const useGameStore = create<GameState>((set, get) => ({
   players: [],
   isHost: false,
   myChain: [],
-  opponentChainLength: 1,
-  opponentChain: [],
   timeLeft: TOTAL_TIME,
   gameStartedAt: null,
   rematchStatus: 'none',
@@ -126,30 +122,23 @@ export const useGameStore = create<GameState>((set, get) => ({
   setPlayers: (players) => {
     const state = get();
     const me = players.find(p => p.id === state.playerId);
-    const opponent = players.find(p => p.id !== state.playerId);
 
     // During rematch transition, don't update chains from potentially stale data
     const shouldUpdateChains = state.rematchStatus !== 'starting';
-    const isGameOver = state.room?.status === 'finished';
 
     console.log('[gameStore.setPlayers]', {
       rematchStatus: state.rematchStatus,
       roomStatus: state.room?.status,
       shouldUpdateChains,
       meIsWinner: me?.is_winner,
-      opponentIsWinner: opponent?.is_winner,
       meChainLength: me?.chain?.length,
-      opponentChainLength: opponent?.chain?.length,
       meWantsRematch: me?.wants_rematch,
-      opponentWantsRematch: opponent?.wants_rematch,
+      totalPlayers: players.length,
     });
 
     set({
       players,
       myChain: shouldUpdateChains ? (me?.chain || []) : state.myChain,
-      opponentChainLength: shouldUpdateChains ? (opponent?.chain?.length || 1) : state.opponentChainLength,
-      // Only reveal full opponent chain when game is over
-      opponentChain: isGameOver ? (opponent?.chain || []) : [],
     });
   },
 
@@ -160,11 +149,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     );
 
     const me = newPlayers.find(p => p.id === state.playerId);
-    const opponent = newPlayers.find(p => p.id !== state.playerId);
 
     // During rematch transition, don't update chains from potentially stale data
     const shouldUpdateChains = state.rematchStatus !== 'starting';
-    const isGameOver = state.room?.status === 'finished';
 
     console.log('[gameStore.updatePlayer]', {
       updatedPlayerId: playerId,
@@ -178,15 +165,11 @@ export const useGameStore = create<GameState>((set, get) => ({
     set({
       players: newPlayers,
       myChain: shouldUpdateChains ? (me?.chain || state.myChain) : state.myChain,
-      opponentChainLength: shouldUpdateChains ? (opponent?.chain?.length || state.opponentChainLength) : state.opponentChainLength,
-      // Only reveal full opponent chain when game is over
-      opponentChain: isGameOver ? (opponent?.chain || state.opponentChain) : [],
     });
   },
 
   initGame: (room, playerId, players) => {
     const me = players.find(p => p.id === playerId);
-    const opponent = players.find(p => p.id !== playerId);
     const gameFinished = room.status === 'finished';
 
     // Determine if current player is host (first player by created_at)
@@ -208,14 +191,11 @@ export const useGameStore = create<GameState>((set, get) => ({
       players,
       isHost,
       myChain: me?.chain || [room.start_word],
-      opponentChainLength: opponent?.chain?.length || 1,
-      // Only reveal full opponent chain if game is already finished
-      opponentChain: gameFinished ? (opponent?.chain || [room.start_word]) : [],
       timeLeft,
       gameStartedAt: room.started_at || null,
       rematchStatus: 'none',
       localGameEnded: gameFinished,
-      winner: null,
+      winner: room.winner_id || null,
       error: null,
       isValidating: false,
     });
@@ -317,19 +297,9 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   endGame: (winnerId) => {
     const state = get();
-    let winner: 'me' | 'opponent' | 'draw' | null = null;
-
-    if (winnerId === null) {
-      winner = 'draw';
-    } else if (winnerId === state.playerId) {
-      winner = 'me';
-    } else {
-      winner = 'opponent';
-    }
 
     console.log('[gameStore.endGame] CALLED', {
       winnerId,
-      computedWinner: winner,
       rematchStatus: state.rematchStatus,
       roomStatus: state.room?.status,
       myChainLength: state.myChain.length,
@@ -337,12 +307,9 @@ export const useGameStore = create<GameState>((set, get) => ({
       stack: new Error().stack,
     });
 
-    // Reveal full opponent chain now that game is over
-    const opponent = state.players.find(p => p.id !== state.playerId);
     set({
       localGameEnded: true,
-      winner,
-      opponentChain: opponent?.chain || [],
+      winner: winnerId,
     });
 
     // If this is a draw (time ran out), notify the server to update room status
@@ -440,8 +407,6 @@ export const useGameStore = create<GameState>((set, get) => ({
       rematchStatus: 'starting',
       localGameEnded: false,
       myChain: [startWord],
-      opponentChainLength: 1,
-      opponentChain: [],
       timeLeft: state.room?.time_limit || TOTAL_TIME,
       winner: null,
       error: null,
@@ -507,8 +472,6 @@ export const useGameStore = create<GameState>((set, get) => ({
     players: [],
     isHost: false,
     myChain: [],
-    opponentChainLength: 1,
-    opponentChain: [],
     timeLeft: TOTAL_TIME,
     gameStartedAt: null,
     rematchStatus: 'none',

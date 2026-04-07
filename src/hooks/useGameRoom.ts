@@ -253,14 +253,19 @@ export function useGameRoom(roomId: string | null) {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- room object reference changes frequently, we only want to react to status changes
   }, [room?.status, rematchStatus, tick]);
 
-  const getOpponent = useCallback(() => {
-    return players.find(p => p.id !== playerId);
+  const getOtherPlayers = useCallback(() => {
+    return players.filter(p => p.id !== playerId);
+  }, [players, playerId]);
+
+  const getMyPlayer = useCallback(() => {
+    return players.find(p => p.id === playerId);
   }, [players, playerId]);
 
   return {
     room,
     players,
-    opponent: getOpponent(),
+    otherPlayers: getOtherPlayers(),
+    myPlayer: getMyPlayer(),
     isWaiting: room?.status === 'waiting',
     isPlaying: room?.status === 'playing' && rematchStatus !== 'starting' && !localGameEnded,
     isFinished: room?.status === 'finished' || localGameEnded,
