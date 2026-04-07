@@ -2,46 +2,33 @@
 
 import { useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
-import { Plus, LogIn } from 'lucide-react';
-import { useDailyStore } from '@/stores/dailyStore';
-import { ensureSessionId } from '@/lib/sessionId';
+import { Home, RotateCcw, Plus, LogIn } from 'lucide-react';
+import { usePracticeStore } from '@/stores/practiceStore';
 import { WordInput } from '@/components/game/WordInput';
 import { ChainDisplay } from '@/components/game/ChainDisplay';
-import { DailyCompletionModal } from './DailyCompletionModal';
+import { PracticeCompletionModal } from './PracticeCompletionModal';
 import { calculatePathQuality } from '@/lib/scoring';
-import type { DailyData } from '@/lib/daily.server';
 
-interface DailyChallengeProps {
-  initialData: DailyData | null;
-}
-
-export function DailyChallenge({ initialData }: DailyChallengeProps) {
+export function PracticeMode() {
   const initialized = useRef(false);
   const {
     puzzle,
     chain,
     isComplete,
-    hasCompletedToday,
     isLoading,
     isValidating,
     error,
-    sessionId,
-    initializeWithData,
+    loadNewPuzzle,
     submitWord,
-  } = useDailyStore();
+    reset,
+  } = usePracticeStore();
 
-  // Initialize store with SSR data on mount
+  // Initialize with a new puzzle on mount
   useEffect(() => {
     if (initialized.current) return;
     initialized.current = true;
-
-    // Ensure session cookie exists (creates one if new user)
-    const sid = ensureSessionId();
-
-    if (initialData) {
-      initializeWithData(initialData, sid);
-    }
-  }, [initialData, initializeWithData]);
+    loadNewPuzzle();
+  }, [loadNewPuzzle]);
 
   const handleSubmitWord = useCallback(
     async (word: string) => {
@@ -49,6 +36,11 @@ export function DailyChallenge({ initialData }: DailyChallengeProps) {
     },
     [submitWord]
   );
+
+  const handleNewPuzzle = useCallback(() => {
+    reset();
+    loadNewPuzzle();
+  }, [reset, loadNewPuzzle]);
 
   // Loading state
   if (isLoading || !puzzle) {
@@ -60,7 +52,7 @@ export function DailyChallenge({ initialData }: DailyChallengeProps) {
             <span className="w-2 h-2 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: '150ms' }} />
             <span className="w-2 h-2 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: '300ms' }} />
           </div>
-          <p className="text-[var(--text-muted)] mt-2">Loading today&apos;s puzzle...</p>
+          <p className="text-[var(--text-muted)] mt-2">Loading puzzle...</p>
         </div>
       </div>
     );
@@ -72,24 +64,13 @@ export function DailyChallenge({ initialData }: DailyChallengeProps) {
     : null;
 
   // Show completion modal when complete
-  if (isComplete && puzzle) {
+  if (isComplete) {
     return (
-      <DailyCompletionModal
+      <PracticeCompletionModal
         puzzle={puzzle}
         chain={chain}
         pathQuality={pathQuality}
-      />
-    );
-  }
-
-  // Already completed view - show their solution with option to practice
-  if (hasCompletedToday && !isComplete && puzzle) {
-    return (
-      <DailyCompletionModal
-        puzzle={puzzle}
-        chain={chain}
-        pathQuality={pathQuality}
-        alreadyCompleted
+        onNewPuzzle={handleNewPuzzle}
       />
     );
   }
@@ -99,7 +80,7 @@ export function DailyChallenge({ initialData }: DailyChallengeProps) {
       {/* Header */}
       <div className="text-center mb-4">
         <div className="text-xs text-[var(--text-muted)] uppercase tracking-wider mb-1">
-          Today&apos;s Challenge
+          Practice Mode
         </div>
         <div className="flex items-center justify-center gap-2">
           <span className="font-mono font-bold text-lg text-[var(--present)] uppercase">
@@ -110,6 +91,9 @@ export function DailyChallenge({ initialData }: DailyChallengeProps) {
             {puzzle.target_word}
           </span>
         </div>
+        <p className="text-xs text-[var(--text-muted)] mt-1">
+          Results won&apos;t be saved
+        </p>
       </div>
 
       {/* Game Card */}
@@ -136,20 +120,32 @@ export function DailyChallenge({ initialData }: DailyChallengeProps) {
         />
       </div>
 
-      {/* Other Modes */}
-      <div className="mt-4 opacity-40 hover:opacity-100 transition-opacity duration-300">
-        <div className="flex items-center gap-3 mb-3">
-          <div className="flex-1 h-px bg-[var(--border)]" />
-          <span className="text-xs text-[var(--text-muted)] uppercase tracking-wide">other modes</span>
-          <div className="flex-1 h-px bg-[var(--border)]" />
-        </div>
-        <div className="space-y-2">
+      {/* Actions */}
+      <div className="mt-4 space-y-2">
+        <div className="flex gap-2">
           <Link
-            href="/practice"
-            className="w-full py-2.5 rounded-md border border-[var(--border)] text-[var(--text-muted)] text-sm font-medium hover:border-[var(--correct)] hover:text-[var(--correct)] transition-colors flex items-center justify-center gap-2"
+            href="/"
+            className="flex-1 py-2.5 rounded-md border border-[var(--border)] text-[var(--text-muted)] text-sm font-medium hover:border-[var(--present)] hover:text-[var(--present)] transition-colors flex items-center justify-center gap-2"
           >
-            Practice Mode
+            <Home className="w-4 h-4" />
+            Daily Challenge
           </Link>
+          <button
+            onClick={handleNewPuzzle}
+            className="flex-1 py-2.5 rounded-md border border-[var(--border)] text-[var(--text-muted)] text-sm font-medium hover:border-[var(--correct)] hover:text-[var(--correct)] transition-colors flex items-center justify-center gap-2"
+          >
+            <RotateCcw className="w-4 h-4" />
+            New Puzzle
+          </button>
+        </div>
+
+        {/* Multiplayer Buttons */}
+        <div className="mt-4 opacity-40 hover:opacity-100 transition-opacity duration-300">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="flex-1 h-px bg-[var(--border)]" />
+            <span className="text-xs text-[var(--text-muted)] uppercase tracking-wide">or play with friends</span>
+            <div className="flex-1 h-px bg-[var(--border)]" />
+          </div>
           <div className="flex gap-2">
             <Link
               href="/multiplayer?action=create"

@@ -74,7 +74,6 @@ interface DailyState {
   chain: string[];
   isComplete: boolean;
   hasCompletedToday: boolean;
-  isPracticeMode: boolean;
 
   // Completion data (for already completed puzzles)
   previousCompletion: DailyCompletion | null;
@@ -99,7 +98,6 @@ interface DailyState {
   loadStatus: () => Promise<void>;
   loadLeaderboard: () => Promise<void>;
   submitWord: (word: string) => Promise<boolean>;
-  startPracticeMode: () => void;
   reset: () => void;
 }
 
@@ -108,7 +106,6 @@ export const useDailyStore = create<DailyState>((set, get) => ({
   chain: [],
   isComplete: false,
   hasCompletedToday: false,
-  isPracticeMode: false,
   previousCompletion: null,
   isLoading: false,
   isValidating: false,
@@ -314,8 +311,8 @@ export const useDailyStore = create<DailyState>((set, get) => ({
         hasCompletedToday: data.isComplete && !data.isPractice ? true : state.hasCompletedToday,
       });
 
-      // Save progress to localStorage (only for non-practice, non-complete attempts)
-      if (!state.isPracticeMode && !data.isComplete && state.puzzle) {
+      // Save progress to localStorage (only for non-complete attempts)
+      if (!data.isComplete && state.puzzle) {
         saveChainToStorage(state.puzzle.puzzle_date, data.chain);
       }
 
@@ -339,24 +336,12 @@ export const useDailyStore = create<DailyState>((set, get) => ({
     }
   },
 
-  startPracticeMode: () => {
-    const { puzzle } = get();
-    if (!puzzle) return;
-
-    set({
-      isPracticeMode: true,
-      isComplete: false,
-      chain: [puzzle.start_word],
-    });
-  },
-
   reset: () =>
     set({
       puzzle: null,
       chain: [],
       isComplete: false,
       hasCompletedToday: false,
-      isPracticeMode: false,
       previousCompletion: null,
       isLoading: false,
       isValidating: false,

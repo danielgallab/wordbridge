@@ -13,7 +13,6 @@ interface DailyCompletionModalProps {
   puzzle: DailyPuzzle;
   chain: string[];
   pathQuality: { rating: PathQuality; emoji: string; description: string } | null;
-  onPractice: () => void;
   alreadyCompleted?: boolean;
 }
 
@@ -21,7 +20,6 @@ export function DailyCompletionModal({
   puzzle,
   chain,
   pathQuality,
-  onPractice,
   alreadyCompleted,
 }: DailyCompletionModalProps) {
   const { loadLeaderboard, stats } = useDailyStore();
@@ -127,12 +125,12 @@ export function DailyCompletionModal({
           </button>
 
           {/* Practice Button */}
-          <button
-            onClick={onPractice}
-            className="w-full py-3 rounded-md bg-[var(--surface)] border border-[var(--border)] text-[var(--text)] font-bold hover:opacity-90 transition-opacity"
+          <Link
+            href="/practice"
+            className="w-full py-3 rounded-md bg-[var(--surface)] border border-[var(--border)] text-[var(--text)] font-bold hover:opacity-90 transition-opacity flex items-center justify-center"
           >
-            Practice Again
-          </button>
+            Practice Mode
+          </Link>
 
           {/* Multiplayer Buttons */}
           <div className="flex gap-2">
