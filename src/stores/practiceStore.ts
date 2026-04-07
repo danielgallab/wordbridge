@@ -97,13 +97,14 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
     });
 
     try {
-      const response = await fetch('/api/daily/practice/submit', {
+      const response = await fetch('/api/daily/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           word: normalizedWord,
           currentChain: previousChain,
           targetWord: state.puzzle.target_word,
+          isPractice: true,
         }),
       });
 

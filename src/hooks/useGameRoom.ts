@@ -234,10 +234,13 @@ export function useGameRoom(roomId: string | null) {
 
   // Game timer - runs when room.status is 'playing' and not in rematch transition
   useEffect(() => {
+    // Always clear any existing interval first
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
     if (!room || room.status !== 'playing' || rematchStatus === 'starting') {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
       return;
     }
 
@@ -248,6 +251,7 @@ export function useGameRoom(roomId: string | null) {
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
+        timerRef.current = null;
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps -- room object reference changes frequently, we only want to react to status changes

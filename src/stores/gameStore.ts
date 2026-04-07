@@ -263,7 +263,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       });
 
       if (data.isWinner) {
-        get().endGame(state.playerId);
+        get().endGame(get().playerId);
       }
 
       return true;
@@ -284,7 +284,17 @@ export const useGameStore = create<GameState>((set, get) => ({
     // Use room.status to check if game is playing, also check localGameEnded
     if (state.room?.status !== 'playing' || state.localGameEnded) return state.timeLeft;
 
-    const newTime = Math.max(0, state.timeLeft - 1);
+    // Calculate time remaining from server timestamp to prevent drift
+    let newTime: number;
+    if (state.gameStartedAt) {
+      const timeLimit = state.room?.time_limit || TOTAL_TIME;
+      const elapsedSeconds = Math.floor((Date.now() - new Date(state.gameStartedAt).getTime()) / 1000);
+      newTime = Math.max(0, timeLimit - elapsedSeconds);
+    } else {
+      // Fallback to decrement if no server timestamp (shouldn't happen)
+      newTime = Math.max(0, state.timeLeft - 1);
+    }
+
     set({ timeLeft: newTime });
 
     // Time's up - it's a draw (no winner unless someone reached the target)

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
-import { singularize } from '@/lib/singularize';
 
 // POST /api/rooms/submit - Submit a word to the chain
 export async function POST(request: NextRequest) {
@@ -45,10 +44,10 @@ export async function POST(request: NextRequest) {
 
     const currentChain = player.chain || [];
     const lastWord = currentChain[currentChain.length - 1];
-    // Singularize the word to normalize plurals (e.g., "hands" -> "hand")
-    const newWord = singularize(word.trim().toLowerCase());
+    // Basic cleanup only - AI will handle singularization
+    const newWord = word.trim().toLowerCase();
 
-    // Don't allow duplicates
+    // Don't allow duplicates (check will be refined after AI normalization)
     if (currentChain.includes(newWord)) {
       return NextResponse.json({ error: 'Already used', reason: 'already_used' }, { status: 400 });
     }
@@ -71,9 +70,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Use the normalized word if AI provided one (e.g., "hands" -> "hand")
+    const finalWord = validateData.normalizedWord || newWord;
+
+    // Check if the normalized word is already in the chain
+    if (currentChain.includes(finalWord)) {
+      return NextResponse.json({ error: 'Already used', reason: 'already_used' }, { status: 400 });
+    }
+
     // Add word to chain
-    const newChain = [...currentChain, newWord];
-    const isWinner = newWord === room.target_word.toLowerCase();
+    const newChain = [...currentChain, finalWord];
+    const isWinner = finalWord === room.target_word.toLowerCase();
 
     const updateData: Record<string, unknown> = { chain: newChain };
     if (isWinner) {

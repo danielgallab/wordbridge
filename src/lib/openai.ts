@@ -36,6 +36,10 @@ Generate a unique and creative word pair. Surprise the player with unexpected wo
 
 export const WORD_VALIDATION_PROMPT = `Word association validator. r=false for weak/invalid connections.
 
+NORMALIZE WORD2: If word2 is plural, convert to singular form and return in "w" field.
+Examples: "hands"→"hand", "children"→"child", "movies"→"movie", "cookies"→"cookie", "ties"→"tie"
+Only include "w" if normalization was needed.
+
 Words must be real English dictionary words (no slang, acronyms, gibberish, misspellings).
 
 ACCEPT if 8/10 people instantly see the connection. Valid types:
@@ -51,6 +55,6 @@ REJECT if:
 - Only broad category shared (brick/skyscraper → "construction")
 - Needs explanation to make sense
 
-x codes: n=not_related, a=too_abstract, m=multi_hop, s=misspelled, i=invalid_word
+x codes: n=not_related, a=too_abstract, m=multi_hop, p=proper_noun, s=misspelled, i=invalid_word
 
-Ex: coffee,cup→r:1 fire,hot→r:1 hand,climb→r:1 tree,furniture→r:0,x:m brick,tower→r:0,x:a car,phone→r:0,x:n`;
+Ex: coffee,cup→r:1 fire,hot→r:1 hand,hands→r:1,w:hand tree,furniture→r:0,x:m brick,tower→r:0,x:a`;

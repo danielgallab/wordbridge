@@ -19,6 +19,7 @@ export type RejectionReason =
 const WordAssociationResult = z.object({
   r: z.boolean(), // related
   x: z.enum(['n', 'a', 'm', 'p', 's', 'i']).nullable(), // rejection: not_related, abstract, multi_hop, proper_noun, misspelled, invalid
+  w: z.string().nullable().optional(), // normalized word2 (singular form) - only present if normalization was needed
 });
 
 // Map short codes back to full rejection reasons
@@ -42,9 +43,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Singularize words to normalize plurals (e.g., "hands" -> "hand")
-    const w1 = singularize(word1.toLowerCase().trim());
-    const w2 = singularize(word2.toLowerCase().trim());
+    // word1 should already be normalized (from previous validation)
+    // word2 is the new word - only do basic cleanup, let AI handle singularization
+    const w1 = word1.toLowerCase().trim();
+    const w2 = word2.toLowerCase().trim();
 
     // Basic validation
     if (w1 === w2) {
@@ -66,13 +68,19 @@ export async function POST(request: NextRequest) {
     const abortController = new AbortController();
     const openai = getOpenAI();
 
+    // Check cache for both the original word2 and a potential singular form
+    // We use client-side singularize as a hint for cache lookup only
+    const w2Singular = singularize(w2);
     const cachePromise = supabase
       .from('word_associations')
-      .select('is_valid, rejection_reason')
-      .or(`and(word1.eq.${w1},word2.eq.${w2}),and(word1.eq.${w2},word2.eq.${w1})`)
+      .select('is_valid, rejection_reason, word2')
+      .or(
+        `and(word1.eq.${w1},word2.eq.${w2}),and(word1.eq.${w2},word2.eq.${w1}),` +
+        `and(word1.eq.${w1},word2.eq.${w2Singular}),and(word1.eq.${w2Singular},word2.eq.${w1})`
+      )
       .limit(1)
       .single()
-      .then((result: { data: { is_valid: boolean; rejection_reason: RejectionReason | null } | null }) => ({
+      .then((result: { data: { is_valid: boolean; rejection_reason: RejectionReason | null; word2: string } | null }) => ({
         type: 'cache' as const,
         data: result.data
       }));
@@ -84,7 +92,7 @@ export async function POST(request: NextRequest) {
         { role: 'user', content: `${w1},${w2}` },
       ],
       response_format: zodResponseFormat(WordAssociationResult, 'word_association'),
-      max_completion_tokens: 20,
+      max_completion_tokens: 30, // Slightly more tokens to accommodate normalized word
       temperature: 0,
     }, {
       signal: abortController.signal,
@@ -100,10 +108,13 @@ export async function POST(request: NextRequest) {
 
     if (result && result.type === 'cache' && result.data !== null) {
       abortController.abort(); // Cancel OpenAI request
+      // Return the cached word2 as normalizedWord if it differs from input
+      const normalizedWord = result.data.word2 !== w2 ? result.data.word2 : undefined;
       return NextResponse.json({
         isValid: result.data.is_valid,
         cached: true,
         reason: result.data.rejection_reason || (result.data.is_valid ? undefined : 'not_related'),
+        normalizedWord,
       });
     }
 
@@ -111,41 +122,66 @@ export async function POST(request: NextRequest) {
     const response = (result && result.type === 'openai') ? result.data : await openaiPromise.then(r => r?.data);
 
     if (!response) {
-      throw new Error('Failed to get OpenAI response');
+      // OpenAI failed - reject the word with a user-friendly message rather than 500 error
+      console.error('OpenAI response was null or aborted');
+      return NextResponse.json({
+        isValid: false,
+        cached: false,
+        reason: 'not_related',
+        error: 'Could not validate word, please try again',
+      });
     }
 
     const content = response.choices[0]?.message?.content;
     let isValid = false;
     let rejectionReason: RejectionReason | undefined;
+    let normalizedWord: string | undefined;
     if (content) {
       try {
         const parsed = JSON.parse(content);
         isValid = parsed.r === true;
         rejectionReason = parsed.x ? rejectionMap[parsed.x] : undefined;
+        // AI returns normalized word in 'w' field if it needed to singularize
+        if (parsed.w && parsed.w !== w2) {
+          normalizedWord = parsed.w;
+        }
       } catch {
         isValid = false;
         rejectionReason = 'invalid_word';
       }
     }
 
-    // Cache the result (including rejection reason)
-    await supabase.from('word_associations').insert({
-      word1: w1,
-      word2: w2,
-      is_valid: isValid,
-      rejection_reason: rejectionReason,
+    // Determine the final word to cache (use normalized if provided)
+    const finalWord2 = normalizedWord || w2;
+
+    // Cache the result - cache both original and normalized forms if different
+    const cacheInserts = [{ word1: w1, word2: finalWord2, is_valid: isValid, rejection_reason: rejectionReason }];
+    if (normalizedWord && normalizedWord !== w2) {
+      // Also cache the original plural form pointing to the same result
+      cacheInserts.push({ word1: w1, word2: w2, is_valid: isValid, rejection_reason: rejectionReason });
+    }
+
+    // Don't await to avoid blocking response
+    supabase.from('word_associations').insert(cacheInserts).then(() => {
+      // Cached successfully
+    }).catch((err: unknown) => {
+      console.error('Failed to cache word association:', err);
     });
 
     return NextResponse.json({
       isValid,
       cached: false,
       reason: isValid ? undefined : (rejectionReason || 'not_related'),
+      normalizedWord,
     });
   } catch (error) {
     console.error('Word validation error:', error);
-    return NextResponse.json(
-      { error: 'Failed to validate word' },
-      { status: 500 }
-    );
+    // Return a rejection instead of 500 error for better UX
+    return NextResponse.json({
+      isValid: false,
+      cached: false,
+      reason: 'not_related',
+      error: 'Validation failed, please try again',
+    });
   }
 }

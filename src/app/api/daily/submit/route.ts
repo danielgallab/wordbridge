@@ -1,13 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
-import { singularize } from '@/lib/singularize';
 
-// POST /api/daily/submit - Submit a word to the daily challenge
+// POST /api/daily/submit - Submit a word to the daily challenge or practice mode
 export async function POST(request: NextRequest) {
   try {
-    const { sessionId, puzzleId, word, currentChain } = await request.json();
+    const { sessionId, puzzleId, word, currentChain, targetWord, isPractice } = await request.json();
 
-    if (!sessionId || !puzzleId || !word?.trim() || !Array.isArray(currentChain)) {
+    // Practice mode: only needs word, currentChain, and targetWord
+    // Daily mode: needs sessionId, puzzleId, word, and currentChain
+    if (!word?.trim() || !Array.isArray(currentChain)) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    // For practice mode, we just need the targetWord
+    if (isPractice) {
+      if (!targetWord?.trim()) {
+        return NextResponse.json({ error: 'Missing targetWord for practice mode' }, { status: 400 });
+      }
+      return handleWordSubmission(request, currentChain, word, targetWord.toLowerCase());
+    }
+
+    // For daily mode, we need sessionId and puzzleId
+    if (!sessionId || !puzzleId) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
@@ -24,7 +38,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Puzzle not found' }, { status: 404 });
     }
 
-    // Check if already completed (unless in practice mode - handled client-side)
+    // Check if already completed
     const { data: existingCompletion } = await supabase
       .from('daily_completions')
       .select('id')
@@ -32,34 +46,15 @@ export async function POST(request: NextRequest) {
       .eq('session_id', sessionId)
       .single();
 
-    // Get the last word in the chain
-    const lastWord = currentChain[currentChain.length - 1];
-    const newWord = singularize(word.trim().toLowerCase());
+    // Validate and get the new chain
+    const result = await handleWordSubmission(request, currentChain, word, puzzle.target_word.toLowerCase());
+    const resultData = await result.json();
 
-    // Don't allow duplicates
-    if (currentChain.includes(newWord)) {
-      return NextResponse.json({ error: 'Already used', reason: 'already_used' }, { status: 400 });
+    if (!result.ok) {
+      return NextResponse.json(resultData, { status: result.status });
     }
 
-    // Validate word association via our API
-    const validateRes = await fetch(new URL('/api/validate-word', request.url), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ word1: lastWord, word2: newWord }),
-    });
-
-    const validateData = await validateRes.json();
-
-    if (!validateData.isValid) {
-      return NextResponse.json(
-        { error: `"${newWord}" is not associated with "${lastWord}"`, reason: validateData.reason },
-        { status: 400 }
-      );
-    }
-
-    // Build the new chain
-    const newChain = [...currentChain, newWord];
-    const isComplete = newWord === puzzle.target_word.toLowerCase();
+    const { chain: newChain, isComplete } = resultData;
 
     // If completed and not already completed, save the completion
     if (isComplete && !existingCompletion) {
@@ -85,7 +80,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // If complete but was already completed (practice mode)
+    // If complete but was already completed (replaying)
     if (isComplete && existingCompletion) {
       return NextResponse.json({
         success: true,
@@ -105,6 +100,60 @@ export async function POST(request: NextRequest) {
     console.error('Daily submit error:', error);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
+}
+
+// Shared word submission logic for both daily and practice modes
+async function handleWordSubmission(
+  request: NextRequest,
+  currentChain: string[],
+  word: string,
+  targetWord: string
+): Promise<NextResponse> {
+  // Get the last word in the chain
+  const lastWord = currentChain[currentChain.length - 1];
+  // Basic cleanup only - AI will handle singularization
+  const newWord = word.trim().toLowerCase();
+
+  // Don't allow duplicates (check will be refined after AI normalization)
+  if (currentChain.includes(newWord)) {
+    return NextResponse.json({ error: 'Already used', reason: 'already_used' }, { status: 400 });
+  }
+
+  // Validate word association via our API
+  const validateRes = await fetch(new URL('/api/validate-word', request.url), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ word1: lastWord, word2: newWord }),
+  });
+
+  const validateData = await validateRes.json();
+
+  if (!validateData.isValid) {
+    return NextResponse.json(
+      { error: `"${newWord}" is not associated with "${lastWord}"`, reason: validateData.reason },
+      { status: 400 }
+    );
+  }
+
+  // Use the normalized word if AI provided one (e.g., "hands" -> "hand")
+  const finalWord = validateData.normalizedWord || newWord;
+
+  // Check if the normalized word is already in the chain
+  if (currentChain.includes(finalWord)) {
+    return NextResponse.json({ error: 'Already used', reason: 'already_used' }, { status: 400 });
+  }
+
+  // Build the new chain
+  const newChain = [...currentChain, finalWord];
+  const isComplete = finalWord === targetWord;
+
+  return NextResponse.json({
+    success: true,
+    chain: newChain,
+    isComplete,
+    wordCount: newChain.length,
+    isPractice: true,
+  });
 }
 
 async function updatePlayerStats(

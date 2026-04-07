@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
       })),
     });
 
-    const allWantRematch = players.length === 2 && players.every((p: RoomPlayer) => p.wants_rematch);
+    const allWantRematch = players.length >= 2 && players.every((p: RoomPlayer) => p.wants_rematch);
 
     if (allWantRematch) {
       console.log('[rematch API] Both players want rematch - starting new game');
