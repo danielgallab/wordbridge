@@ -60,16 +60,29 @@ export async function POST(request: NextRequest) {
     if (isComplete && !existingCompletion) {
       const wordCount = newChain.length;
 
-      // Insert completion
-      await supabase.from('daily_completions').insert({
-        puzzle_id: puzzleId,
-        session_id: sessionId,
-        chain: newChain,
-        word_count: wordCount,
-      });
+      // Insert completion with ON CONFLICT to handle race conditions
+      // If another request completed first, this will be a no-op
+      const { data: insertedCompletion, error: insertError } = await supabase
+        .from('daily_completions')
+        .upsert(
+          {
+            puzzle_id: puzzleId,
+            session_id: sessionId,
+            chain: newChain,
+            word_count: wordCount,
+          },
+          {
+            onConflict: 'puzzle_id,session_id',
+            ignoreDuplicates: true,
+          }
+        )
+        .select('id')
+        .maybeSingle();
 
-      // Update player stats
-      await updatePlayerStats(supabase, sessionId, wordCount, puzzle.puzzle_date);
+      // Only update stats if we actually inserted (not a duplicate)
+      if (!insertError && insertedCompletion) {
+        await updatePlayerStats(supabase, sessionId, wordCount, puzzle.puzzle_date);
+      }
 
       return NextResponse.json({
         success: true,

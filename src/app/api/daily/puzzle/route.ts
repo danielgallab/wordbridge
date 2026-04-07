@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { generateWordPair } from '@/lib/wordPairs';
+import { debug } from '@/lib/debug';
 
 // GET /api/daily/puzzle - Get today's puzzle (creates if missing)
 export async function GET() {
@@ -18,13 +19,16 @@ export async function GET() {
       .single();
 
     if (existingPuzzle) {
-      return NextResponse.json({ puzzle: existingPuzzle });
+      // Cache existing puzzle for 5 minutes - puzzle is immutable once created
+      const response = NextResponse.json({ puzzle: existingPuzzle });
+      response.headers.set('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=60');
+      return response;
     }
 
     // No puzzle for today - generate one
     if (fetchError && fetchError.code !== 'PGRST116') {
       // PGRST116 is "no rows returned" - that's expected
-      console.error('Error fetching daily puzzle:', fetchError);
+      debug.api.error('Error fetching daily puzzle:', fetchError);
     }
 
     // Generate a new word pair (medium difficulty for daily challenges)
@@ -56,15 +60,15 @@ export async function GET() {
           return NextResponse.json({ puzzle: racePuzzle });
         }
       }
-      console.error('Error creating daily puzzle:', insertError);
+      debug.api.error('Error creating daily puzzle:', insertError);
       return NextResponse.json({ error: 'Failed to create daily puzzle' }, { status: 500 });
     }
 
-    console.log(`[Daily Puzzle Created] ${newPuzzle.start_word} → ${newPuzzle.target_word} for ${today}`);
+    debug.api.log(`Daily Puzzle Created: ${newPuzzle.start_word} → ${newPuzzle.target_word} for ${today}`);
 
     return NextResponse.json({ puzzle: newPuzzle });
   } catch (error) {
-    console.error('Daily puzzle error:', error);
+    debug.api.error('Daily puzzle error:', error);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }

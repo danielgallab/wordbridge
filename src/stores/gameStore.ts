@@ -1,27 +1,11 @@
 import { create } from 'zustand';
+import { REJECTION_MESSAGES, DEFAULT_TIME_LIMIT, type RejectionReason } from '@/lib/constants';
+import { debug } from '@/lib/debug';
 
-const TOTAL_TIME = 90;
+const TOTAL_TIME = DEFAULT_TIME_LIMIT;
 
-export type RejectionReason =
-  | 'not_related'
-  | 'already_used'
-  | 'invalid_word'
-  | 'same_as_previous'
-  | 'too_abstract'
-  | 'proper_noun'
-  | 'multi_hop'
-  | 'misspelled';
-
-const REJECTION_MESSAGES: Record<RejectionReason, string> = {
-  not_related: 'Not related enough — try a more direct connection',
-  already_used: 'Already used — each word can only appear once',
-  invalid_word: 'Not a valid word — try a common English word',
-  same_as_previous: 'Same as previous — use a different word',
-  too_abstract: 'Too abstract — try something more concrete',
-  proper_noun: 'No proper nouns — use common words only',
-  multi_hop: 'Too far apart — add a word in between',
-  misspelled: 'Check spelling — did you mean something else?',
-};
+// Store timeout ID outside of Zustand state to avoid serialization issues
+let rematchTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
 interface Player {
   id: string;
@@ -106,7 +90,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   setRoom: (room) => {
     const state = get();
     const prevRoom = state.room;
-    console.log('[gameStore.setRoom]', {
+    debug.gameStore.log('setRoom', {
       prevStatus: prevRoom?.status,
       newStatus: room.status,
       prevWinnerId: prevRoom?.winner_id,
@@ -126,7 +110,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     // During rematch transition, don't update chains from potentially stale data
     const shouldUpdateChains = state.rematchStatus !== 'starting';
 
-    console.log('[gameStore.setPlayers]', {
+    debug.gameStore.log('setPlayers', {
       rematchStatus: state.rematchStatus,
       roomStatus: state.room?.status,
       shouldUpdateChains,
@@ -153,7 +137,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     // During rematch transition, don't update chains from potentially stale data
     const shouldUpdateChains = state.rematchStatus !== 'starting';
 
-    console.log('[gameStore.updatePlayer]', {
+    debug.gameStore.log('updatePlayer', {
       updatedPlayerId: playerId,
       isMe: playerId === state.playerId,
       updates,
@@ -308,13 +292,12 @@ export const useGameStore = create<GameState>((set, get) => ({
   endGame: (winnerId) => {
     const state = get();
 
-    console.log('[gameStore.endGame] CALLED', {
+    debug.gameStore.log('endGame CALLED', {
       winnerId,
       rematchStatus: state.rematchStatus,
       roomStatus: state.room?.status,
       myChainLength: state.myChain.length,
       startWord: state.room?.start_word,
-      stack: new Error().stack,
     });
 
     set({
@@ -325,11 +308,27 @@ export const useGameStore = create<GameState>((set, get) => ({
     // If this is a draw (time ran out), notify the server to update room status
     // This ensures room.status becomes 'finished' for rematch detection
     if (winnerId === null && state.room?.id) {
-      fetch('/api/rooms/end', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ roomId: state.room.id }),
-      }).catch(err => console.error('[gameStore.endGame] Failed to notify server:', err));
+      const roomId = state.room.id;
+      const notifyServer = async (retries = 3) => {
+        for (let i = 0; i < retries; i++) {
+          try {
+            const response = await fetch('/api/rooms/end', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ roomId }),
+            });
+            if (response.ok) return;
+            debug.gameStore.error(`Server returned ${response.status}, attempt ${i + 1}/${retries}`);
+          } catch (err) {
+            debug.gameStore.error(`Failed to notify server, attempt ${i + 1}/${retries}:`, err);
+          }
+          // Wait before retry (exponential backoff)
+          if (i < retries - 1) {
+            await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+          }
+        }
+      };
+      notifyServer();
     }
   },
 
@@ -339,7 +338,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const state = get();
     if (!state.room || !state.playerId) return;
 
-    console.log('[gameStore.requestRematch] Starting rematch request', {
+    debug.gameStore.log('requestRematch - Starting', {
       roomId: state.room.id,
       playerId: state.playerId,
       rematchStatus: state.rematchStatus,
@@ -359,16 +358,16 @@ export const useGameStore = create<GameState>((set, get) => ({
       });
 
       const data = await response.json();
-      console.log('[gameStore.requestRematch] API response', data);
+      debug.gameStore.log('requestRematch - API response', data);
 
       if (data.rematchStarted) {
         // Reset local state immediately for the player who triggered rematch
         // The other player will get reset via realtime subscription
-        console.log('[gameStore.requestRematch] Calling resetForRematch with startWord:', data.startWord);
+        debug.gameStore.log('requestRematch - Calling resetForRematch with startWord:', data.startWord);
         get().resetForRematch(data.startWord);
       }
     } catch (err) {
-      console.error('[gameStore.requestRematch] Error:', err);
+      debug.gameStore.error('requestRematch - Error:', err);
       set({ error: 'Failed to request rematch', rematchStatus: 'none' });
       setTimeout(() => set({ error: null }), 2500);
     }
@@ -386,7 +385,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   resetForRematch: (startWord) => {
     const state = get();
-    console.log('[gameStore.resetForRematch] Called', {
+    debug.gameStore.log('resetForRematch - Called', {
       startWord,
       currentStartWord: state.myChain[0],
       currentMyChainLength: state.myChain.length,
@@ -407,11 +406,11 @@ export const useGameStore = create<GameState>((set, get) => ({
       (state.rematchStatus === 'none' || state.rematchStatus === 'starting');
 
     if (alreadyReset) {
-      console.log('[gameStore.resetForRematch] SKIPPING - already reset for this word');
+      debug.gameStore.log('resetForRematch - SKIPPING - already reset for this word');
       return;
     }
 
-    console.log('[gameStore.resetForRematch] Resetting state for new game');
+    debug.gameStore.log('resetForRematch - Resetting state for new game');
     // Set 'starting' to temporarily ignore stale is_winner updates
     set({
       rematchStatus: 'starting',
@@ -422,10 +421,15 @@ export const useGameStore = create<GameState>((set, get) => ({
       error: null,
       isValidating: false,
     });
+    // Clear any existing timeout before setting a new one
+    if (rematchTimeoutId) {
+      clearTimeout(rematchTimeoutId);
+    }
     // Clear rematch status after a delay to allow realtime updates to settle
-    setTimeout(() => {
-      console.log('[gameStore.resetForRematch] Clearing rematch status');
+    rematchTimeoutId = setTimeout(() => {
+      debug.gameStore.log('resetForRematch - Clearing rematch status');
       set({ rematchStatus: 'none' });
+      rematchTimeoutId = null;
     }, 1000);
   },
 
@@ -475,19 +479,26 @@ export const useGameStore = create<GameState>((set, get) => ({
     });
   },
 
-  reset: () => set({
-    room: null,
-    playerId: null,
-    playerName: '',
-    players: [],
-    isHost: false,
-    myChain: [],
-    timeLeft: TOTAL_TIME,
-    gameStartedAt: null,
-    rematchStatus: 'none',
-    localGameEnded: false,
-    winner: null,
-    error: null,
-    isValidating: false,
-  }),
+  reset: () => {
+    // Clear any pending rematch timeout
+    if (rematchTimeoutId) {
+      clearTimeout(rematchTimeoutId);
+      rematchTimeoutId = null;
+    }
+    set({
+      room: null,
+      playerId: null,
+      playerName: '',
+      players: [],
+      isHost: false,
+      myChain: [],
+      timeLeft: TOTAL_TIME,
+      gameStartedAt: null,
+      rematchStatus: 'none',
+      localGameEnded: false,
+      winner: null,
+      error: null,
+      isValidating: false,
+    });
+  },
 }));

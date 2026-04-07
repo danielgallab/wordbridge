@@ -9,11 +9,13 @@ type SoundType = 'success' | 'error' | 'win' | 'lose' | 'tick';
 export function useSoundEffects() {
   const audioContextRef = useRef<AudioContext | null>(null);
   const enabledRef = useRef(true);
+  const initedRef = useRef(false);
 
   // Initialize audio context on first user interaction
   useEffect(() => {
     const initAudio = () => {
-      if (!audioContextRef.current) {
+      if (!audioContextRef.current && !initedRef.current) {
+        initedRef.current = true;
         audioContextRef.current = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
       }
     };
@@ -31,6 +33,13 @@ export function useSoundEffects() {
     return () => {
       document.removeEventListener('click', handler);
       document.removeEventListener('touchstart', handler);
+      // Close audio context on unmount to free resources
+      if (audioContextRef.current) {
+        audioContextRef.current.close().catch(() => {
+          // Ignore errors when closing (may already be closed)
+        });
+        audioContextRef.current = null;
+      }
     };
   }, []);
 

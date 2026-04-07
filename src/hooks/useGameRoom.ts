@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useGameStore } from '@/stores/gameStore';
+import { debug } from '@/lib/debug';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
 export function useGameRoom(roomId: string | null) {
@@ -43,7 +44,7 @@ export function useGameRoom(roomId: string | null) {
           filter: `room_id=eq.${roomId}`,
         },
         (payload) => {
-          console.log('[useGameRoom] room_players realtime event', {
+          debug.useGameRoom.log('room_players realtime event', {
             eventType: payload.eventType,
             new: payload.new,
             old: payload.old,
@@ -75,7 +76,7 @@ export function useGameRoom(roomId: string | null) {
             // 3. Not currently in a rematch transition (ignore stale updates)
             const wasAlreadyWinner = playerBeforeUpdate?.is_winner === true;
 
-            console.log('[useGameRoom] Checking if should endGame from room_players update', {
+            debug.useGameRoom.log('Checking if should endGame from room_players update', {
               updatedPlayerId: updated.id,
               updatedIsWinner: updated.is_winner,
               wasAlreadyWinner,
@@ -85,7 +86,7 @@ export function useGameRoom(roomId: string | null) {
             });
 
             if (updated.is_winner && !wasAlreadyWinner && currentRoom?.status === 'playing' && currentRematchStatus !== 'starting') {
-              console.log('[useGameRoom] TRIGGERING endGame from room_players update');
+              debug.useGameRoom.log('TRIGGERING endGame from room_players update');
               endGame(updated.id);
             }
 
@@ -96,7 +97,7 @@ export function useGameRoom(roomId: string | null) {
             }
           } else if (payload.eventType === 'INSERT') {
             // New player joined - refetch all players and room (room status may have changed to 'playing')
-            console.log('[useGameRoom] New player joined, fetching players and room');
+            debug.useGameRoom.log('New player joined, fetching players and room');
             fetchPlayers();
             fetchRoom();
           }
@@ -124,7 +125,7 @@ export function useGameRoom(roomId: string | null) {
             started_at: string | null;
           };
 
-          console.log('[useGameRoom] rooms realtime event', {
+          debug.useGameRoom.log('rooms realtime event', {
             prevStatus: prevRoom?.status,
             newStatus: updated.status,
             prevStartWord: prevRoom?.start_word,
@@ -138,7 +139,7 @@ export function useGameRoom(roomId: string | null) {
           // Handle game start - sync timer with server timestamp
           const isGameStarting = updated.status === 'playing' && prevRoom?.status === 'waiting';
           if (isGameStarting && updated.started_at) {
-            console.log('[useGameRoom] Game starting - syncing timer with server timestamp', {
+            debug.useGameRoom.log('Game starting - syncing timer with server timestamp', {
               startedAt: updated.started_at,
             });
             setGameStartedAt(updated.started_at);
@@ -155,7 +156,7 @@ export function useGameRoom(roomId: string | null) {
             prevRoom?.start_word !== updated.start_word;
 
           if (isRematchFromFinished || isRematchFromWordChange) {
-            console.log('[useGameRoom] Detected rematch - calling resetForRematch and fetchPlayers', {
+            debug.useGameRoom.log('Detected rematch - calling resetForRematch and fetchPlayers', {
               isRematchFromFinished,
               isRematchFromWordChange,
               prevStartWord: prevRoom?.start_word,
@@ -176,7 +177,7 @@ export function useGameRoom(roomId: string | null) {
           // 1. Room status is 'finished'
           // 2. Previous room status was 'playing' (prevent duplicate calls)
           // 3. Not in a rematch transition (ignore stale updates)
-          console.log('[useGameRoom] Checking if should endGame from rooms update', {
+          debug.useGameRoom.log('Checking if should endGame from rooms update', {
             status: updated.status,
             prevStatus: prevRoom?.status,
             rematchStatus: currentRematchStatus,
@@ -184,7 +185,7 @@ export function useGameRoom(roomId: string | null) {
           });
 
           if (updated.status === 'finished' && prevRoom?.status === 'playing' && currentRematchStatus !== 'starting') {
-            console.log('[useGameRoom] TRIGGERING endGame from rooms update');
+            debug.useGameRoom.log('TRIGGERING endGame from rooms update');
             endGame(updated.winner_id);
           }
         }
@@ -195,14 +196,19 @@ export function useGameRoom(roomId: string | null) {
     fetchPlayers();
 
     async function fetchPlayers() {
-      console.log('[useGameRoom.fetchPlayers] Fetching players for room:', roomId);
-      const { data } = await supabase
+      debug.useGameRoom.log('fetchPlayers - Fetching players for room:', roomId);
+      const { data, error } = await supabase
         .from('room_players')
         .select('*')
         .eq('room_id', roomId);
 
+      if (error) {
+        debug.useGameRoom.error('fetchPlayers - Error fetching players:', error);
+        return;
+      }
+
       if (data) {
-        console.log('[useGameRoom.fetchPlayers] Got players:', data.map(p => ({
+        debug.useGameRoom.log('fetchPlayers - Got players:', data.map(p => ({
           id: p.id,
           is_winner: p.is_winner,
           wants_rematch: p.wants_rematch,
@@ -214,11 +220,16 @@ export function useGameRoom(roomId: string | null) {
     }
 
     async function fetchRoom() {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('rooms')
         .select('*')
         .eq('id', roomId)
         .single();
+
+      if (error) {
+        debug.useGameRoom.error('fetchRoom - Error fetching room:', error);
+        return;
+      }
 
       if (data) {
         setRoom(data);
@@ -257,21 +268,26 @@ export function useGameRoom(roomId: string | null) {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- room object reference changes frequently, we only want to react to status changes
   }, [room?.status, rematchStatus, tick]);
 
-  const getOtherPlayers = useCallback(() => {
+  // Memoize derived values to prevent unnecessary re-renders
+  const otherPlayers = useMemo(() => {
     return players.filter(p => p.id !== playerId);
   }, [players, playerId]);
 
-  const getMyPlayer = useCallback(() => {
+  const myPlayer = useMemo(() => {
     return players.find(p => p.id === playerId);
   }, [players, playerId]);
+
+  const isWaiting = room?.status === 'waiting';
+  const isPlaying = room?.status === 'playing' && rematchStatus !== 'starting' && !localGameEnded;
+  const isFinished = room?.status === 'finished' || localGameEnded;
 
   return {
     room,
     players,
-    otherPlayers: getOtherPlayers(),
-    myPlayer: getMyPlayer(),
-    isWaiting: room?.status === 'waiting',
-    isPlaying: room?.status === 'playing' && rematchStatus !== 'starting' && !localGameEnded,
-    isFinished: room?.status === 'finished' || localGameEnded,
+    otherPlayers,
+    myPlayer,
+    isWaiting,
+    isPlaying,
+    isFinished,
   };
 }

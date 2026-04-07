@@ -4,16 +4,8 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { singularize } from '@/lib/singularize';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import { z } from 'zod';
-
-export type RejectionReason =
-  | 'not_related'
-  | 'already_used'
-  | 'invalid_word'
-  | 'same_as_previous'
-  | 'too_abstract'
-  | 'proper_noun'
-  | 'multi_hop'
-  | 'misspelled';
+import { type RejectionReason } from '@/lib/constants';
+import { debug } from '@/lib/debug';
 
 // Minimal schema for faster response (no reasoning = fewer output tokens)
 const WordAssociationResult = z.object({
@@ -80,7 +72,7 @@ export async function POST(request: NextRequest) {
         `and(word1.eq.${w1},word2.eq.${w2Singular}),and(word1.eq.${w2Singular},word2.eq.${w1})`
       )
       .limit(1)
-      .single()
+      .maybeSingle()
       .then((result: { data: { is_valid: boolean; rejection_reason: RejectionReason | null; word1: string; word2: string } | null }) => ({
         type: 'cache' as const,
         data: result.data
@@ -129,7 +121,7 @@ export async function POST(request: NextRequest) {
 
     if (!response) {
       // OpenAI failed - reject the word with a user-friendly message rather than 500 error
-      console.error('OpenAI response was null or aborted');
+      debug.api.error('OpenAI response was null or aborted');
       return NextResponse.json({
         isValid: false,
         cached: false,
@@ -171,7 +163,7 @@ export async function POST(request: NextRequest) {
     supabase.from('word_associations').insert(cacheInserts).then(() => {
       // Cached successfully
     }).catch((err: unknown) => {
-      console.error('Failed to cache word association:', err);
+      debug.api.error('Failed to cache word association:', err);
     });
 
     return NextResponse.json({
@@ -181,7 +173,7 @@ export async function POST(request: NextRequest) {
       normalizedWord,
     });
   } catch (error) {
-    console.error('Word validation error:', error);
+    debug.api.error('Word validation error:', error);
     // Return a rejection instead of 500 error for better UX
     return NextResponse.json({
       isValid: false,

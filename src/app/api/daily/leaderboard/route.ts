@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
+import { debug } from '@/lib/debug';
 
 // GET /api/daily/leaderboard - Get the daily leaderboard
 export async function GET(request: NextRequest) {
   try {
     const puzzleIdParam = request.nextUrl.searchParams.get('puzzleId');
     const limitParam = request.nextUrl.searchParams.get('limit');
-    const limit = limitParam ? parseInt(limitParam, 10) : 10;
+    // Validate and clamp limit to reasonable bounds (1-100)
+    const parsedLimit = limitParam ? parseInt(limitParam, 10) : 10;
+    const limit = Math.min(Math.max(isNaN(parsedLimit) ? 10 : parsedLimit, 1), 100);
 
     const supabase = createServiceClient();
 
@@ -29,24 +32,19 @@ export async function GET(request: NextRequest) {
 
     // Get completions ordered by word count (fewest words = best)
     // Include chain for top entries to display on leaderboard
-    const { data: completions, error } = await supabase
+    // Use count: 'exact' to get total count in the same query
+    const { data: completions, error, count } = await supabase
       .from('daily_completions')
-      .select('session_id, player_name, word_count, completed_at, chain')
+      .select('session_id, player_name, word_count, completed_at, chain', { count: 'exact' })
       .eq('puzzle_id', puzzleId)
       .order('word_count', { ascending: true })
       .order('completed_at', { ascending: true })
       .limit(limit);
 
     if (error) {
-      console.error('Leaderboard query error:', error);
+      debug.api.error('Leaderboard query error:', error);
       return NextResponse.json({ error: 'Failed to fetch leaderboard' }, { status: 500 });
     }
-
-    // Get total count
-    const { count } = await supabase
-      .from('daily_completions')
-      .select('*', { count: 'exact', head: true })
-      .eq('puzzle_id', puzzleId);
 
     // Format leaderboard with ranks
     // Include chain only for top 5 entries
@@ -59,12 +57,16 @@ export async function GET(request: NextRequest) {
       chain: index < 5 ? entry.chain : undefined,
     }));
 
-    return NextResponse.json({
+    // Cache leaderboard for 60 seconds to reduce database load
+    // stale-while-revalidate allows serving stale data while fetching fresh
+    const response = NextResponse.json({
       leaderboard,
       totalCompletions: count || 0,
     });
+    response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=30');
+    return response;
   } catch (error) {
-    console.error('Leaderboard error:', error);
+    debug.api.error('Leaderboard error:', error);
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
