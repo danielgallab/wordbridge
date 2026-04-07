@@ -145,13 +145,6 @@ export function DailyChallenge({ initialData }: DailyChallengeProps) {
         />
       </div>
 
-      {/* Session info for debugging (hidden in production) */}
-      {process.env.NODE_ENV === 'development' && sessionId && (
-        <p className="text-xs text-[var(--text-muted)] text-center mt-2">
-          Session: {sessionId.slice(0, 8)}...
-        </p>
-      )}
-
       {/* Multiplayer CTA */}
       <div className="mt-6">
         <div className="flex items-center gap-3 mb-4">

@@ -1,6 +1,7 @@
 'use client';
 
 import { ArrowDown } from 'lucide-react';
+import { useRef, useEffect } from 'react';
 
 interface ChainDisplayProps {
   chain: string[];
@@ -12,6 +13,18 @@ interface ChainDisplayProps {
 }
 
 export function ChainDisplay({ chain, targetWord, isPlayer = false, isValidating = false, chainLength, censored = false }: ChainDisplayProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom when chain updates
+  useEffect(() => {
+    if (containerRef.current) {
+      containerRef.current.scrollTo({
+        top: containerRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
+    }
+  }, [chain.length]);
+
   // For censored display, show only the middle words (exclude start word at index 0)
   const displayCount = censored ? (chainLength ?? chain.length) : chain.length;
 
@@ -28,7 +41,7 @@ export function ChainDisplay({ chain, targetWord, isPlayer = false, isValidating
     }
 
     return (
-      <div className="flex flex-col gap-0">
+      <div ref={containerRef} className="flex flex-col gap-0 max-h-[250px] overflow-y-auto p-1">
         {Array.from({ length: middleWordCount }, (_, i) => (
           <div key={i}>
             {/* Connecting arrow */}
@@ -48,7 +61,7 @@ export function ChainDisplay({ chain, targetWord, isPlayer = false, isValidating
   const items = chain;
 
   return (
-    <div className="flex flex-col gap-0">
+    <div ref={containerRef} className="flex flex-col gap-0 max-h-[250px] overflow-y-auto p-1">
       {items.map((item, index) => {
         const word = item as string;
         const isStart = index === 0;
