@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
 
 interface WordInputProps {
   onSubmit: (word: string) => void;
@@ -9,11 +9,23 @@ interface WordInputProps {
   error?: string | null;
 }
 
-export function WordInput({ onSubmit, disabled, isValidating, error }: WordInputProps) {
+export interface WordInputHandle {
+  focus: () => void;
+  clear: () => void;
+}
+
+export const WordInput = forwardRef<WordInputHandle, WordInputProps>(
+  function WordInput({ onSubmit, disabled, isValidating, error }, ref) {
   const [value, setValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const lastSubmitRef = useRef<number>(0);
   const DEBOUNCE_MS = 300; // Prevent rapid submissions
+
+  // Expose focus and clear methods to parent
+  useImperativeHandle(ref, () => ({
+    focus: () => inputRef.current?.focus(),
+    clear: () => setValue(''),
+  }), []);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -113,4 +125,4 @@ export function WordInput({ onSubmit, disabled, isValidating, error }: WordInput
       )}
     </div>
   );
-}
+});

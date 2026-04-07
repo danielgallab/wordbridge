@@ -4,11 +4,12 @@ import { useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { Home, RotateCcw, Plus, LogIn } from 'lucide-react';
 import { usePracticeStore, type PracticePuzzle } from '@/stores/practiceStore';
-import { WordInput } from '@/components/game/WordInput';
+import { WordInput, type WordInputHandle } from '@/components/game/WordInput';
 import { ChainDisplay } from '@/components/game/ChainDisplay';
 import { PracticeCompletionModal } from './PracticeCompletionModal';
 import { calculatePathQuality } from '@/lib/scoring';
 import { useSoundEffects } from '@/hooks/useSoundEffects';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import type { PracticeData } from '@/lib/daily.server';
 
 interface PracticeModeProps {
@@ -19,7 +20,14 @@ export function PracticeMode({ initialData }: PracticeModeProps) {
   const initialized = useRef(false);
   const prevChainLengthRef = useRef(0);
   const prevErrorRef = useRef<string | null>(null);
+  const wordInputRef = useRef<WordInputHandle>(null);
   const { play: playSound } = useSoundEffects();
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts({
+    onClearInput: () => wordInputRef.current?.clear(),
+    onFocusInput: () => wordInputRef.current?.focus(),
+  });
   const {
     puzzle,
     chain,
@@ -149,6 +157,7 @@ export function PracticeMode({ initialData }: PracticeModeProps) {
 
         {/* Word Input */}
         <WordInput
+          ref={wordInputRef}
           onSubmit={handleSubmitWord}
           disabled={isComplete}
           isValidating={isValidating}
@@ -200,6 +209,7 @@ export function PracticeMode({ initialData }: PracticeModeProps) {
           </div>
         </div>
       </div>
-    </div>
+
+      </div>
   );
 }

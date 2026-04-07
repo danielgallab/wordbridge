@@ -5,11 +5,12 @@ import Link from 'next/link';
 import { Plus, LogIn } from 'lucide-react';
 import { useDailyStore } from '@/stores/dailyStore';
 import { ensureSessionId } from '@/lib/sessionId';
-import { WordInput } from '@/components/game/WordInput';
+import { WordInput, type WordInputHandle } from '@/components/game/WordInput';
 import { ChainDisplay } from '@/components/game/ChainDisplay';
 import { DailyCompletionModal } from './DailyCompletionModal';
 import { calculatePathQuality } from '@/lib/scoring';
 import { useSoundEffects } from '@/hooks/useSoundEffects';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import type { DailyData } from '@/lib/daily.server';
 
 interface DailyChallengeProps {
@@ -20,7 +21,14 @@ export function DailyChallenge({ initialData }: DailyChallengeProps) {
   const initialized = useRef(false);
   const prevChainLengthRef = useRef(0);
   const prevErrorRef = useRef<string | null>(null);
+  const wordInputRef = useRef<WordInputHandle>(null);
   const { play: playSound } = useSoundEffects();
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts({
+    onClearInput: () => wordInputRef.current?.clear(),
+    onFocusInput: () => wordInputRef.current?.focus(),
+  });
   const {
     puzzle,
     chain,
@@ -154,6 +162,7 @@ export function DailyChallenge({ initialData }: DailyChallengeProps) {
 
         {/* Word Input */}
         <WordInput
+          ref={wordInputRef}
           onSubmit={handleSubmitWord}
           disabled={isComplete}
           isValidating={isValidating}
@@ -193,6 +202,7 @@ export function DailyChallenge({ initialData }: DailyChallengeProps) {
           </div>
         </div>
       </div>
-    </div>
+
+      </div>
   );
 }

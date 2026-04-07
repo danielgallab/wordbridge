@@ -88,6 +88,7 @@ export function GameArena() {
   // Sound effects
   const { play: playSound } = useSoundEffects();
 
+  
   // Play sound on successful word submission
   useEffect(() => {
     if (myChain.length > prevChainLength) {
@@ -366,6 +367,7 @@ export function GameArena() {
           />
         </Suspense>
       )}
-    </div>
+
+      </div>
   );
 }

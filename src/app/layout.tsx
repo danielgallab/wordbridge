@@ -3,6 +3,7 @@ import './globals.css';
 import { Footer } from '@/components/Footer';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
+import { ThemeProvider } from '@/contexts/ThemeContext';
 
 const title = 'Word Bridge';
 const description =
@@ -43,10 +44,33 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full">
+    <html lang="en" className="h-full" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var theme = localStorage.getItem('wordbridge-theme');
+                  var resolved;
+                  if (theme === 'dark' || theme === 'light') {
+                    resolved = theme;
+                  } else {
+                    resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                  }
+                  document.documentElement.classList.remove('light', 'dark');
+                  document.documentElement.classList.add(resolved);
+                } catch (e) {}
+              })();
+            `,
+          }}
+        />
+      </head>
       <body className="min-h-full flex flex-col bg-[var(--background)] text-[var(--text)]">
-                {children}
-        <Footer />
+        <ThemeProvider>
+          {children}
+          <Footer />
+        </ThemeProvider>
         <Analytics />
         <SpeedInsights />
       </body>

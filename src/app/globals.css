@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
+/* Light mode - Wordle inspired (default) */
 :root {
-  /* Light mode - Wordle inspired */
   --background: #ffffff;
   --surface: #f5f5f5;
   --border: #d3d6da;
@@ -13,19 +13,30 @@
   --error: #ff4444;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* Dark mode - Wordle inspired */
-    --background: #121213;
-    --surface: #1a1a1b;
-    --border: #3a3a3c;
-    --text: #ffffff;
-    --text-muted: #818384;
-    --correct: #538d4e;
-    --present: #b59f3b;
-    --absent: #565758;
-    --error: #ff4444;
-  }
+/* Dark mode - Wordle inspired */
+html.dark {
+  --background: #121213;
+  --surface: #1a1a1b;
+  --border: #3a3a3c;
+  --text: #ffffff;
+  --text-muted: #818384;
+  --correct: #538d4e;
+  --present: #b59f3b;
+  --absent: #565758;
+  --error: #ff4444;
+}
+
+/* Light mode explicit (for when switching from dark) */
+html.light {
+  --background: #ffffff;
+  --surface: #f5f5f5;
+  --border: #d3d6da;
+  --text: #1a1a1b;
+  --text-muted: #787c7e;
+  --correct: #6aaa64;
+  --present: #c9b458;
+  --absent: #787c7e;
+  --error: #ff4444;
 }
 
 @theme inline {
