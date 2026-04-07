@@ -5,6 +5,7 @@ import { Upload, Plus, LogIn, CheckCircle, PartyPopper } from 'lucide-react';
 import { useDailyStore } from '@/stores/dailyStore';
 import { DailyLeaderboard } from './DailyLeaderboard';
 import { DailyStats } from './DailyStats';
+import { NameInputModal } from './NameInputModal';
 import type { DailyPuzzle } from '@/types';
 import type { PathQuality } from '@/lib/scoring';
 import Link from 'next/link';
@@ -22,13 +23,46 @@ export function DailyCompletionModal({
   pathQuality,
   alreadyCompleted,
 }: DailyCompletionModalProps) {
-  const { loadLeaderboard, stats } = useDailyStore();
+  const { loadLeaderboard, stats, sessionId, previousCompletion } = useDailyStore();
   const [shareStatus, setShareStatus] = useState<'idle' | 'copied'>('idle');
+  // Show name input only when just completed AND doesn't already have a name saved
+  const hasExistingName = !!(stats?.playerName || previousCompletion?.playerName);
+  const [showNameInput, setShowNameInput] = useState(!alreadyCompleted && !hasExistingName);
+  const [isSubmittingName, setIsSubmittingName] = useState(false);
 
   // Load leaderboard on mount
   useEffect(() => {
     loadLeaderboard();
   }, [loadLeaderboard]);
+
+  const handleNameSubmit = async (name: string) => {
+    setIsSubmittingName(true);
+    try {
+      const response = await fetch('/api/daily/name', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId,
+          puzzleId: puzzle.id,
+          playerName: name,
+        }),
+      });
+
+      if (response.ok) {
+        setShowNameInput(false);
+        // Reload leaderboard to show updated name
+        await loadLeaderboard();
+      }
+    } catch (error) {
+      console.error('Failed to submit name:', error);
+    } finally {
+      setIsSubmittingName(false);
+    }
+  };
+
+  const handleNameSkip = () => {
+    setShowNameInput(false);
+  };
 
   const wordCount = chain.length;
   const puzzleNumber = puzzle.id;
@@ -107,6 +141,15 @@ export function DailyCompletionModal({
             {chain.join(' → ')}
           </div>
         </div>
+
+        {/* Name Input - only show when just completed (not already completed) */}
+        {showNameInput && (
+          <NameInputModal
+            onSubmit={handleNameSubmit}
+            onSkip={handleNameSkip}
+            isSubmitting={isSubmittingName}
+          />
+        )}
 
         {/* Stats */}
         {stats && <DailyStats stats={stats} />}

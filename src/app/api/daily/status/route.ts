@@ -67,6 +67,7 @@ export async function GET(request: NextRequest) {
             chain: completion.chain,
             wordCount: completion.word_count,
             completedAt: completion.completed_at,
+            playerName: completion.player_name,
           }
         : null,
       stats: stats
@@ -76,6 +77,7 @@ export async function GET(request: NextRequest) {
             totalCompletions: stats.total_completions,
             bestWordCount: stats.best_word_count,
             averageWordCount,
+            playerName: stats.player_name,
           }
         : null,
     });

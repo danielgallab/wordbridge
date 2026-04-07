@@ -70,6 +70,7 @@ export interface DailyCompletion {
   chain: string[];
   wordCount: number;
   completedAt: string;
+  playerName?: string | null;
 }
 
 export interface PlayerStats {
@@ -78,6 +79,7 @@ export interface PlayerStats {
   totalCompletions: number;
   bestWordCount: number | null;
   averageWordCount: number | null;
+  playerName?: string | null;
 }
 
 export interface LeaderboardEntry {
@@ -85,6 +87,7 @@ export interface LeaderboardEntry {
   playerName: string;
   wordCount: number;
   completedAt: string;
+  chain?: string[];
 }
 
 export type ValidationResult = {

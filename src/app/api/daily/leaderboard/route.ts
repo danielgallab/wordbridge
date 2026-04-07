@@ -28,9 +28,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Get completions ordered by word count (fewest words = best)
+    // Include chain for top entries to display on leaderboard
     const { data: completions, error } = await supabase
       .from('daily_completions')
-      .select('session_id, player_name, word_count, completed_at')
+      .select('session_id, player_name, word_count, completed_at, chain')
       .eq('puzzle_id', puzzleId)
       .order('word_count', { ascending: true })
       .order('completed_at', { ascending: true })
@@ -48,11 +49,14 @@ export async function GET(request: NextRequest) {
       .eq('puzzle_id', puzzleId);
 
     // Format leaderboard with ranks
-    const leaderboard = (completions || []).map((entry: { session_id: string; player_name: string | null; word_count: number; completed_at: string }, index: number) => ({
+    // Include chain only for top 5 entries
+    const leaderboard = (completions || []).map((entry: { session_id: string; player_name: string | null; word_count: number; completed_at: string; chain: string[] }, index: number) => ({
       rank: index + 1,
       playerName: entry.player_name || 'Anonymous',
       wordCount: entry.word_count,
       completedAt: entry.completed_at,
+      // Only include chain for top 5 to reduce payload size
+      chain: index < 5 ? entry.chain : undefined,
     }));
 
     return NextResponse.json({
