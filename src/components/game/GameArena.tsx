@@ -1,21 +1,40 @@
 'use client';
 
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useEffect, lazy, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
-import { Upload, Trophy, Skull, Handshake } from 'lucide-react';
 import { Timer } from './Timer';
 import { PlayerPanel } from './PlayerPanel';
 import { CompactPlayerPanel } from './CompactPlayerPanel';
 import { useGameStore } from '@/stores/gameStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useGameRoom } from '@/hooks/useGameRoom';
 import { calculatePathQuality } from '@/lib/scoring';
 import { useSoundEffects } from '@/hooks/useSoundEffects';
+
+// Lazy load the game over modal content since it's not needed until game ends
+const GameOverContent = lazy(() => import('./GameOverContent').then(m => ({ default: m.GameOverContent })));
+
+// Loading fallback for lazy-loaded component
+function GameOverLoading() {
+  return (
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+      <div className="bg-[var(--background)] border-2 border-[var(--border)] rounded-xl p-8 text-center">
+        <div className="flex gap-1 justify-center">
+          <span className="w-2 h-2 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: '0ms' }} />
+          <span className="w-2 h-2 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: '150ms' }} />
+          <span className="w-2 h-2 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: '300ms' }} />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const TOTAL_TIME = 90;
 
 export function GameArena() {
   const router = useRouter();
 
+  // Use useShallow to prevent re-renders when unrelated state changes
   const {
     room,
     playerId,
@@ -27,11 +46,26 @@ export function GameArena() {
     isValidating,
     players,
     isHost,
-    submitWord,
-    requestRematch,
-    startGame,
-    reset,
-  } = useGameStore();
+  } = useGameStore(
+    useShallow((state) => ({
+      room: state.room,
+      playerId: state.playerId,
+      myChain: state.myChain,
+      timeLeft: state.timeLeft,
+      rematchStatus: state.rematchStatus,
+      winner: state.winner,
+      error: state.error,
+      isValidating: state.isValidating,
+      players: state.players,
+      isHost: state.isHost,
+    }))
+  );
+
+  // Actions don't need shallow comparison - they're stable references
+  const submitWord = useGameStore((state) => state.submitWord);
+  const requestRematch = useGameStore((state) => state.requestRematch);
+  const startGame = useGameStore((state) => state.startGame);
+  const reset = useGameStore((state) => state.reset);
 
   const { otherPlayers, myPlayer, isWaiting, isPlaying, isFinished } = useGameRoom(room?.id || null);
 
@@ -48,7 +82,6 @@ export function GameArena() {
 
   // Delay showing rematch UI so both players can see chains first
   const [showRematchUI, setShowRematchUI] = useState(false);
-  const [shareStatus, setShareStatus] = useState<'idle' | 'copied'>('idle');
   const [gameOverKey, setGameOverKey] = useState(0);
   const [prevChainLength, setPrevChainLength] = useState(myChain.length);
 
@@ -104,7 +137,7 @@ export function GameArena() {
     ? calculatePathQuality(myChain.length, room?.difficulty || 'medium')
     : null;
 
-  const handleShare = async () => {
+  const handleShare = useCallback(async () => {
     const shareText = `WordBridge: ${room?.start_word.toUpperCase()} → ${room?.target_word.toUpperCase()}\n` +
       `My chain (${myChain.length - 1} steps): ${myChain.join(' → ')}\n` +
       `Play at: wordbridge.app`;
@@ -114,20 +147,16 @@ export function GameArena() {
         await navigator.share({ text: shareText });
       } else {
         await navigator.clipboard.writeText(shareText);
-        setShareStatus('copied');
-        setTimeout(() => setShareStatus('idle'), 2000);
       }
     } catch {
       // User cancelled or error - try clipboard as fallback
       try {
         await navigator.clipboard.writeText(shareText);
-        setShareStatus('copied');
-        setTimeout(() => setShareStatus('idle'), 2000);
       } catch {
         // Clipboard not available
       }
     }
-  };
+  }, [room?.start_word, room?.target_word, myChain]);
 
   const handleSubmitWord = useCallback(
     async (word: string) => {
@@ -315,123 +344,27 @@ export function GameArena() {
         )}
       </div>
 
-      {/* Game Over Overlay */}
+      {/* Game Over Overlay - Lazy Loaded */}
       {showGameOver && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-[var(--background)] border-2 border-[var(--border)] rounded-xl p-4 sm:p-8 text-center max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="text-4xl sm:text-5xl mb-3 sm:mb-4 flex justify-center">
-              {didIWin ? (
-                <Trophy className="w-12 h-12 sm:w-14 sm:h-14 text-[var(--correct)]" />
-              ) : isDraw ? (
-                <Handshake className="w-12 h-12 sm:w-14 sm:h-14 text-[var(--present)]" />
-              ) : (
-                <Skull className="w-12 h-12 sm:w-14 sm:h-14 text-[var(--error)]" />
-              )}
-            </div>
-            <h2
-              className={`text-xl sm:text-2xl font-bold mb-2 ${
-                didIWin
-                  ? 'text-[var(--correct)]'
-                  : isDraw
-                  ? 'text-[var(--present)]'
-                  : 'text-[var(--error)]'
-              }`}
-            >
-              {didIWin ? 'You Win!' : isDraw ? 'Draw!' : `${winnerPlayer?.player_name || 'Someone'} Wins!`}
-            </h2>
-
-            {/* Path quality rating */}
-            {pathQuality && didIWin && (
-              <div className="mb-3">
-                <span className="text-2xl">{pathQuality.emoji}</span>
-                <p className="text-sm text-[var(--text-muted)]">{pathQuality.description}</p>
-              </div>
-            )}
-
-            {/* All players chain comparison */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
-              {/* Your chain first */}
-              {myChain.length > 1 && (
-                <div className={`bg-[var(--surface)] rounded-lg p-2 sm:p-3 text-left ${didIWin ? 'border-2 border-[var(--correct)]' : ''}`}>
-                  <div className="text-xs uppercase text-[var(--text-muted)] mb-1 font-bold flex items-center justify-between">
-                    <span>You ({myChain.length - 1} steps)</span>
-                    {didIWin && <Trophy className="w-3 h-3 text-[var(--correct)]" />}
-                  </div>
-                  <div className="font-mono text-xs text-[var(--present)] break-words">
-                    {myChain.join(' → ')}
-                  </div>
-                </div>
-              )}
-
-              {/* Other players chains */}
-              {otherPlayers.map((player) => {
-                const playerChain = player.chain;
-                if (!playerChain || playerChain.length <= 1) return null;
-                const isPlayerWinner = winner === player.id;
-
-                return (
-                  <div
-                    key={player.id}
-                    className={`bg-[var(--surface)] rounded-lg p-2 sm:p-3 text-left ${isPlayerWinner ? 'border-2 border-[var(--correct)]' : ''}`}
-                  >
-                    <div className="text-xs uppercase text-[var(--text-muted)] mb-1 font-bold flex items-center justify-between">
-                      <span>{player.player_name} ({playerChain.length - 1} steps)</span>
-                      {isPlayerWinner && <Trophy className="w-3 h-3 text-[var(--correct)]" />}
-                    </div>
-                    <div className="font-mono text-xs text-[var(--text-muted)] break-words">
-                      {playerChain.join(' → ')}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Share button */}
-            <button
-              onClick={handleShare}
-              className="w-full py-2 rounded-md bg-[var(--surface)] border border-[var(--border)] text-[var(--text)] font-bold hover:opacity-90 transition-opacity mb-3 flex items-center justify-center gap-2"
-            >
-              <Upload className="w-4 h-4" />
-              {shareStatus === 'copied' ? 'Copied!' : 'Share Result'}
-            </button>
-
-            {/* Rematch UI - delayed appearance */}
-            {showRematchUI && (
-              <>
-                {wantsRematch || isRematchStarting ? (
-                  <div className="w-full py-3 rounded-md bg-[var(--surface)] border border-[var(--border)] text-[var(--text)] font-bold mb-3 flex items-center justify-center gap-2">
-                    {isRematchStarting ? (
-                      <>Starting rematch...</>
-                    ) : (
-                      <>
-                        Waiting for other players
-                        <span className="flex gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: '0ms' }} />
-                          <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: '150ms' }} />
-                          <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-muted)] animate-bounce" style={{ animationDelay: '300ms' }} />
-                        </span>
-                      </>
-                    )}
-                  </div>
-                ) : (
-                  <button
-                    onClick={requestRematch}
-                    className="w-full py-3 rounded-md bg-[var(--correct)] text-white font-bold hover:opacity-90 transition-opacity mb-3"
-                  >
-                    {opponentWantsRematch ? 'Others want a rematch!' : 'Play Again'}
-                  </button>
-                )}
-              </>
-            )}
-
-            <button
-              onClick={handleGoHome}
-              className="w-full py-3 rounded-md bg-[var(--surface)] border border-[var(--border)] text-[var(--text)] font-bold hover:opacity-90 transition-opacity"
-            >
-              Back to Home
-            </button>
-          </div>
-        </div>
+        <Suspense fallback={<GameOverLoading />}>
+          <GameOverContent
+            didIWin={didIWin}
+            isDraw={isDraw}
+            winnerPlayer={winnerPlayer}
+            pathQuality={pathQuality}
+            myChain={myChain}
+            otherPlayers={otherPlayers}
+            winner={winner}
+            room={{ start_word: room.start_word, target_word: room.target_word }}
+            showRematchUI={showRematchUI}
+            wantsRematch={wantsRematch}
+            isRematchStarting={isRematchStarting}
+            opponentWantsRematch={opponentWantsRematch}
+            onShare={handleShare}
+            onRequestRematch={requestRematch}
+            onGoHome={handleGoHome}
+          />
+        </Suspense>
       )}
     </div>
   );

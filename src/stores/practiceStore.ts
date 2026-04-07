@@ -21,9 +21,14 @@ const REJECTION_MESSAGES: Record<RejectionReason, string> = {
   misspelled: 'Check spelling — did you mean something else?',
 };
 
+export interface PracticePuzzle {
+  start_word: string;
+  target_word: string;
+}
+
 interface PracticeState {
   // Puzzle state
-  puzzle: { start_word: string; target_word: string } | null;
+  puzzle: PracticePuzzle | null;
   chain: string[];
   isComplete: boolean;
 
@@ -33,6 +38,7 @@ interface PracticeState {
   error: string | null;
 
   // Actions
+  initializeWithData: (puzzle: PracticePuzzle) => void;
   loadNewPuzzle: () => Promise<void>;
   submitWord: (word: string) => Promise<boolean>;
   reset: () => void;
@@ -45,6 +51,17 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
   isLoading: false,
   isValidating: false,
   error: null,
+
+  initializeWithData: (puzzle: PracticePuzzle) => {
+    set({
+      puzzle,
+      chain: [puzzle.start_word],
+      isComplete: false,
+      isLoading: false,
+      isValidating: false,
+      error: null,
+    });
+  },
 
   loadNewPuzzle: async () => {
     set({ isLoading: true, error: null });

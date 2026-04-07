@@ -2,6 +2,30 @@ import { createServiceClient } from '@/lib/supabase/server';
 import type { DailyPuzzle, DailyCompletion, PlayerStats } from '@/types';
 import { generateWordPair } from '@/lib/wordPairs';
 
+export interface PracticeData {
+  puzzle: {
+    start_word: string;
+    target_word: string;
+  };
+}
+
+export async function getPracticeData(): Promise<PracticeData | null> {
+  try {
+    const supabase = createServiceClient();
+    const wordPair = await generateWordPair(supabase, 'medium');
+
+    return {
+      puzzle: {
+        start_word: wordPair.start_word,
+        target_word: wordPair.target_word,
+      },
+    };
+  } catch (error) {
+    console.error('Failed to get practice data:', error);
+    return null;
+  }
+}
+
 export interface DailyData {
   puzzle: DailyPuzzle;
   sessionId: string;

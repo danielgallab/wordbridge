@@ -3,14 +3,19 @@
 import { useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { Home, RotateCcw, Plus, LogIn } from 'lucide-react';
-import { usePracticeStore } from '@/stores/practiceStore';
+import { usePracticeStore, type PracticePuzzle } from '@/stores/practiceStore';
 import { WordInput } from '@/components/game/WordInput';
 import { ChainDisplay } from '@/components/game/ChainDisplay';
 import { PracticeCompletionModal } from './PracticeCompletionModal';
 import { calculatePathQuality } from '@/lib/scoring';
 import { useSoundEffects } from '@/hooks/useSoundEffects';
+import type { PracticeData } from '@/lib/daily.server';
 
-export function PracticeMode() {
+interface PracticeModeProps {
+  initialData: PracticeData | null;
+}
+
+export function PracticeMode({ initialData }: PracticeModeProps) {
   const initialized = useRef(false);
   const prevChainLengthRef = useRef(0);
   const prevErrorRef = useRef<string | null>(null);
@@ -22,17 +27,23 @@ export function PracticeMode() {
     isLoading,
     isValidating,
     error,
+    initializeWithData,
     loadNewPuzzle,
     submitWord,
     reset,
   } = usePracticeStore();
 
-  // Initialize with a new puzzle on mount
+  // Initialize with SSR data on mount, or fetch if no initial data
   useEffect(() => {
     if (initialized.current) return;
     initialized.current = true;
-    loadNewPuzzle();
-  }, [loadNewPuzzle]);
+
+    if (initialData?.puzzle) {
+      initializeWithData(initialData.puzzle as PracticePuzzle);
+    } else {
+      loadNewPuzzle();
+    }
+  }, [initialData, initializeWithData, loadNewPuzzle]);
 
   // Play sound effects on chain changes and errors
   useEffect(() => {

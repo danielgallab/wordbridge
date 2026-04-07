@@ -1,11 +1,17 @@
 import { PracticeMode } from '@/components/practice/PracticeMode';
+import { getPracticeData } from '@/lib/daily.server';
+
+// Generate fresh puzzle on each request
+export const dynamic = 'force-dynamic';
 
 export const metadata = {
   title: 'Practice Mode - WORDBRIDGE',
   description: 'Practice word association with unlimited random puzzles',
 };
 
-export default function PracticePage() {
+export default async function PracticePage() {
+  const practiceData = await getPracticeData();
+
   return (
     <main className="flex-1 flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-md pt-8 sm:pt-12">
@@ -18,7 +24,7 @@ export default function PracticePage() {
         </p>
 
         {/* Practice Mode */}
-        <PracticeMode />
+        <PracticeMode initialData={practiceData} />
       </div>
     </main>
   );
