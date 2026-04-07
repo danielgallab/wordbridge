@@ -33,7 +33,9 @@ export function WordInput({ onSubmit, disabled, isValidating, error }: WordInput
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setValue(e.target.value.toLowerCase());
+    // Don't transform the value - let mobile keyboards work naturally
+    // The value is normalized to lowercase on submit, and CSS displays it uppercase
+    setValue(e.target.value);
   };
 
   return (
