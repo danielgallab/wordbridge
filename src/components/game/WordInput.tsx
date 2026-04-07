@@ -33,12 +33,7 @@ export function WordInput({ onSubmit, disabled, isValidating, error }: WordInput
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Use requestAnimationFrame to ensure autocomplete text is fully inserted
-    // before converting to lowercase
-    const newValue = e.target.value;
-    requestAnimationFrame(() => {
-      setValue(newValue.toLowerCase());
-    });
+    setValue(e.target.value.toLowerCase());
   };
 
   return (
