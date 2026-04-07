@@ -14,25 +14,31 @@ export function WordInput({ onSubmit, disabled, isValidating, error }: WordInput
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!disabled && !isValidating) {
-      inputRef.current?.focus();
-    }
-  }, [disabled, isValidating]);
+    inputRef.current?.focus();
+  }, []);
 
   const handleSubmit = () => {
     const trimmed = value.trim().toLowerCase();
     if (trimmed && !disabled && !isValidating) {
-      onSubmit(trimmed);
       setValue('');
-      // Refocus input after submission      
-      inputRef.current?.focus();
+      onSubmit(trimmed);
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
+      e.preventDefault();
       handleSubmit();
     }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Use requestAnimationFrame to ensure autocomplete text is fully inserted
+    // before converting to lowercase
+    const newValue = e.target.value;
+    requestAnimationFrame(() => {
+      setValue(newValue.toLowerCase());
+    });
   };
 
   return (
@@ -42,10 +48,11 @@ export function WordInput({ onSubmit, disabled, isValidating, error }: WordInput
           ref={inputRef}
           type="text"
           value={value}
-          onChange={(e) => setValue(e.target.value.toLowerCase())}
+          onChange={handleChange}
           onKeyDown={handleKeyDown}
           placeholder="Type next word..."
-          disabled={disabled || isValidating}
+          disabled={disabled}
+          readOnly={isValidating}
           maxLength={20}
           autoComplete="off"
           autoCapitalize="none"
@@ -57,6 +64,7 @@ export function WordInput({ onSubmit, disabled, isValidating, error }: WordInput
             placeholder:text-[var(--text-muted)] placeholder:normal-case
             focus:outline-none focus:border-[var(--correct)]
             disabled:opacity-50
+            ${isValidating ? 'opacity-70' : ''}
             ${error ? 'border-[var(--error)] shake' : ''}
           `}
         />
@@ -70,7 +78,7 @@ export function WordInput({ onSubmit, disabled, isValidating, error }: WordInput
             disabled:opacity-30 disabled:cursor-not-allowed
           `}
         >
-          {isValidating ? '...' : 'GO'}
+          GO
         </button>
       </div>
       {error && (
