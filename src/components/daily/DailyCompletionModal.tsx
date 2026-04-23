@@ -9,6 +9,7 @@ import { NameInputModal } from './NameInputModal';
 import type { DailyPuzzle } from '@/types';
 import type { PathQuality } from '@/lib/scoring';
 import type { ShareCompletion } from '@/lib/daily.server';
+import { getWordEmoji } from '@/lib/wordEmoji';
 import Link from 'next/link';
 
 interface DailyCompletionModalProps {
@@ -80,8 +81,11 @@ export function DailyCompletionModal({
   const handleShare = async () => {
     // Build attempt pattern: ✅ for valid, ❌ for invalid
     const attemptIcons = attempts.map(a => a.valid ? '✅' : '❌').join(' ');
-    const attemptLine = `${puzzle.start_word.toUpperCase()} → ${attemptIcons} → ${puzzle.target_word.toUpperCase()}`;
-    const missteps = attempts.filter(a => !a.valid).length;
+    const startEmoji = getWordEmoji(puzzle.start_word);
+    const targetEmoji = getWordEmoji(puzzle.target_word);
+    const startDisplay = startEmoji || puzzle.start_word.toUpperCase();
+    const targetDisplay = targetEmoji || puzzle.target_word.toUpperCase();
+    const attemptLine = `${startDisplay} → ${attemptIcons} → ${targetDisplay}`;
 
     // Use completion ID for short share URL
     const shareUrl = shareCode
@@ -90,8 +94,7 @@ export function DailyCompletionModal({
 
     const shareText =
       `WordBridge Daily #${puzzleNumber}\n\n` +
-      `${attemptLine} ${pathQuality?.emoji || ''}\n\n` +
-      `I bridged it in ${wordCount} words with ${missteps} misstep${missteps === 1 ? '' : 's'}. Can you beat that?\n\n` +
+      `${attemptLine}\n\n` +
       shareUrl;
 
     try {
