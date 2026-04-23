@@ -28,12 +28,18 @@ export const WordInput = forwardRef<WordInputHandle, WordInputProps>(
   }), []);
 
   useEffect(() => {
-    inputRef.current?.focus();
+    // Skip programmatic focus on touch devices (iOS Safari shows focus ring
+    // but won't open the keyboard without a user gesture, which is confusing)
+    const isTouch = window.matchMedia('(pointer: coarse)').matches;
+    if (!isTouch) {
+      inputRef.current?.focus();
+    }
   }, []);
 
-  // Re-focus input after validation completes (for rapid play)
+  // Re-focus input after validation completes (for rapid play on desktop)
   useEffect(() => {
-    if (!isValidating && inputRef.current) {
+    const isTouch = window.matchMedia('(pointer: coarse)').matches;
+    if (!isValidating && inputRef.current && !isTouch) {
       inputRef.current.focus();
     }
   }, [isValidating]);
@@ -87,7 +93,9 @@ export const WordInput = forwardRef<WordInputHandle, WordInputProps>(
           aria-label="Enter your next word"
           aria-invalid={!!error}
           aria-describedby={error ? 'word-input-error' : undefined}
-          autoFocus
+          // autoFocus omitted — iOS Safari focuses the input but doesn't open
+          // the keyboard, creating a confusing state. The useEffect above
+          // handles focus for non-touch devices instead.
           className={`
             flex-1 px-3 sm:px-4 py-2.5 sm:py-3 rounded-md text-base
             bg-[var(--surface)] border-2 border-[var(--border)]
