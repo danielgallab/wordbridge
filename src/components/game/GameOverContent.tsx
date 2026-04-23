@@ -97,6 +97,15 @@ export function GameOverContent({
           </div>
         )}
 
+        {/* Share button */}
+        <button
+          onClick={handleShare}
+          className="w-full py-2 rounded-md bg-[var(--correct)] text-white font-bold hover:opacity-90 transition-opacity mb-4 flex items-center justify-center gap-2"
+        >
+          <Upload className="w-4 h-4" />
+          {shareStatus === 'copied' ? 'Copied!' : 'Share Result'}
+        </button>
+
         {/* All players chain comparison */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
           {/* Your chain first */}
@@ -134,15 +143,6 @@ export function GameOverContent({
             );
           })}
         </div>
-
-        {/* Share button */}
-        <button
-          onClick={handleShare}
-          className="w-full py-2 rounded-md bg-[var(--surface)] border border-[var(--border)] text-[var(--text)] font-bold hover:opacity-90 transition-opacity mb-3 flex items-center justify-center gap-2"
-        >
-          <Upload className="w-4 h-4" />
-          {shareStatus === 'copied' ? 'Copied!' : 'Share Result'}
-        </button>
 
         {/* Rematch UI - delayed appearance */}
         {showRematchUI && (

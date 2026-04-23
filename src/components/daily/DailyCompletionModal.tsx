@@ -92,8 +92,10 @@ export function DailyCompletionModal({
       ? `https://wordbridge.danielgallab.com/?share=${shareCode}`
       : `https://wordbridge.danielgallab.com`;
 
+    const validWords = attempts.filter(a => a.valid).length;
     const shareText =
-      `WordBridge Daily #${puzzleNumber}\n\n` +
+      `WordBridge Daily #${puzzleNumber}\n` +
+      `Bridged in ${validWords} word${validWords === 1 ? '' : 's'}\n\n` +
       `${attemptLine}\n\n` +
       shareUrl;
 
@@ -173,6 +175,15 @@ export function DailyCompletionModal({
           </div>
         )}
 
+        {/* Share Button */}
+        <button
+          onClick={handleShare}
+          className="w-full py-3 rounded-md bg-[var(--correct)] text-white font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2 mb-4"
+        >
+          <Upload className="w-4 h-4" />
+          {shareStatus === 'copied' ? 'Copied!' : 'Share Result'}
+        </button>
+
         {/* Name Input - only show when just completed (not already completed) */}
         {showNameInput && (
           <NameInputModal
@@ -190,15 +201,6 @@ export function DailyCompletionModal({
 
         {/* Action Buttons */}
         <div className="space-y-2 mt-4">
-          {/* Share Button */}
-          <button
-            onClick={handleShare}
-            className="w-full py-3 rounded-md bg-[var(--correct)] text-white font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
-          >
-            <Upload className="w-4 h-4" />
-            {shareStatus === 'copied' ? 'Copied!' : 'Share Result'}
-          </button>
-
           {/* Practice Button */}
           <Link
             href="/practice"

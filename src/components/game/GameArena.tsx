@@ -10,6 +10,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useGameRoom } from '@/hooks/useGameRoom';
 import { calculatePathQuality } from '@/lib/scoring';
 import { useSoundEffects } from '@/hooks/useSoundEffects';
+import { getWordEmoji } from '@/lib/wordEmoji';
 
 // Lazy load the game over modal content since it's not needed until game ends
 const GameOverContent = lazy(() => import('./GameOverContent').then(m => ({ default: m.GameOverContent })));
@@ -143,13 +144,25 @@ export function GameArena() {
   const handleShare = useCallback(async () => {
     // Build attempt pattern: ✅ for valid, ❌ for invalid
     const attemptIcons = myAttempts.map(a => a.valid ? '✅' : '❌').join(' ');
-    const attemptLine = `${room?.start_word.toUpperCase()} → ${attemptIcons} → ${room?.target_word.toUpperCase()}`;
-    const missteps = myAttempts.filter(a => !a.valid).length;
+    const startEmoji = getWordEmoji(room?.start_word || '');
+    const targetEmoji = getWordEmoji(room?.target_word || '');
+    const startDisplay = startEmoji || room?.start_word.toUpperCase();
+    const targetDisplay = targetEmoji || room?.target_word.toUpperCase();
+    const attemptLine = `${startDisplay} → ${attemptIcons} → ${targetDisplay}`;
+    const validWords = myAttempts.filter(a => a.valid).length;
 
-    const shareText = `WordBridge: ${room?.start_word.toUpperCase()} → ${room?.target_word.toUpperCase()}\n` +
+    // Build opponent chain lines
+    const opponentLines = otherPlayers
+      .filter(p => p.chain && p.chain.length > 1)
+      .map(p => `${p.player_name}: ${p.chain.join(' → ')}`)
+      .join('\n');
+
+    const shareText =
+      `WordBridge Multiplayer\n` +
+      `Bridged in ${validWords} word${validWords === 1 ? '' : 's'}\n\n` +
       `${attemptLine}\n` +
-      `Bridged it in ${myChain.length - 1} steps with ${missteps} misstep${missteps === 1 ? '' : 's'}!\n` +
-      `Play at: wordbridge.app`;
+      (opponentLines ? `\n${opponentLines}\n` : '') +
+      `\nhttps://wordbridge.danielgallab.com`;
 
     try {
       if (navigator.share) {
@@ -165,7 +178,7 @@ export function GameArena() {
         // Clipboard not available
       }
     }
-  }, [room?.start_word, room?.target_word, myChain, myAttempts]);
+  }, [room?.start_word, room?.target_word, myChain, myAttempts, otherPlayers]);
 
   const handleSubmitWord = useCallback(
     async (word: string) => {
