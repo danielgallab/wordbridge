@@ -92,22 +92,23 @@ export function PracticeCompletionModal({
 
         {/* Actions */}
         <div className="space-y-2">
-          <div className="flex gap-2">
-            <button
-              onClick={onNewPuzzle}
-              className="flex-1 py-3 rounded-md bg-[var(--correct)] text-white font-medium hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
-            >
-              <RotateCcw className="w-4 h-4" />
-              New Puzzle
-            </button>
-            <Link
-              href="/"
-              className="flex-1 py-3 rounded-md border border-[var(--border)] text-[var(--text-muted)] font-medium hover:border-[var(--present)] hover:text-[var(--present)] transition-colors flex items-center justify-center gap-2"
-            >
-              <Home className="w-4 h-4" />
-              Daily Challenge
-            </Link>
-          </div>
+          {/* New Puzzle Button */}
+          <button
+            onClick={onNewPuzzle}
+            className="w-full py-3 rounded-md bg-[var(--correct)] text-white font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+          >
+            <RotateCcw className="w-4 h-4" />
+            New Puzzle
+          </button>
+
+          {/* Daily Challenge Button */}
+          <Link
+            href="/"
+            className="w-full py-3 rounded-md bg-[var(--surface)] border border-[var(--border)] text-[var(--text)] font-bold hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+          >
+            <Home className="w-4 h-4" />
+            Daily Challenge
+          </Link>
 
           {/* Multiplayer Buttons */}
           <div className="flex gap-2">

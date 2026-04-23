@@ -442,6 +442,14 @@ export const useDailyStore = create<DailyState>((set, get) => ({
 
       const data = await response.json();
 
+      // Verify the chain hasn't changed while the request was in-flight
+      const currentState = get();
+      const latestWord = currentState.chain[currentState.chain.length - 1];
+      if (latestWord !== currentWord) {
+        set({ isFetchingHints: false });
+        return;
+      }
+
       if (response.ok && data.words && data.words.length > 0) {
         set({
           hintWords: data.words,
