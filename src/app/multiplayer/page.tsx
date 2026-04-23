@@ -55,6 +55,9 @@ function MultiplayerContent() {
       setPlayer(data.player.id, data.player.player_name);
       initGame(data.room, data.player.id, [data.player]);
 
+      // Persist playerId for reload recovery
+      try { localStorage.setItem(`wb_player_${data.room.code}`, data.player.id); } catch {}
+
       // Navigate to game
       router.push(`/play/${data.room.code}`);
     } catch {
@@ -99,6 +102,9 @@ function MultiplayerContent() {
       setRoom(data.room);
       setPlayer(data.player.id, data.player.player_name);
       initGame(data.room, data.player.id, data.room.room_players || []);
+
+      // Persist playerId for reload recovery
+      try { localStorage.setItem(`wb_player_${data.room.code}`, data.player.id); } catch {}
 
       // Navigate to game
       router.push(`/play/${data.room.code}`);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState, useEffect, lazy, Suspense } from 'react';
+import { useCallback, useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { Timer } from './Timer';
 import { PlayerPanel } from './PlayerPanel';
@@ -187,6 +187,33 @@ export function GameArena() {
     );
   }
 
+  // Copy invite link handler
+  const [linkCopied, setLinkCopied] = useState(false);
+  const linkCopiedTimeout = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const handleCopyInviteLink = useCallback(async () => {
+    const url = `${window.location.origin}/play/${room?.code}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ url, text: `Join my WordBridge game!` });
+      } else {
+        await navigator.clipboard.writeText(url);
+        setLinkCopied(true);
+        clearTimeout(linkCopiedTimeout.current);
+        linkCopiedTimeout.current = setTimeout(() => setLinkCopied(false), 2000);
+      }
+    } catch {
+      try {
+        await navigator.clipboard.writeText(url);
+        setLinkCopied(true);
+        clearTimeout(linkCopiedTimeout.current);
+        linkCopiedTimeout.current = setTimeout(() => setLinkCopied(false), 2000);
+      } catch {
+        // Clipboard not available
+      }
+    }
+  }, [room?.code]);
+
   // Waiting for players / lobby
   if (isWaiting) {
     const canStart = players.length >= 2;
@@ -209,6 +236,24 @@ export function GameArena() {
               {room.code}
             </div>
           </div>
+
+          {/* Copy invite link button */}
+          <button
+            onClick={handleCopyInviteLink}
+            className="w-full py-2.5 mb-4 sm:mb-6 rounded-md border-2 border-[var(--present)] text-[var(--present)] font-bold text-sm hover:bg-[var(--present)] hover:text-white transition-colors flex items-center justify-center gap-2"
+          >
+            {linkCopied ? (
+              <>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                Link Copied!
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+                Copy Invite Link
+              </>
+            ) }
+          </button>
 
           {/* Player list */}
           <div className="mb-4 sm:mb-6">
