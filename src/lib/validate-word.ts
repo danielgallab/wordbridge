@@ -4,7 +4,7 @@ import { singularize } from '@/lib/singularize';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import { z } from 'zod';
 import { type RejectionReason } from '@/lib/constants';
-import { debug } from '@/lib/debug';
+import { debug, monitor } from '@/lib/debug';
 
 const WordAssociationResult = z.object({
   r: z.boolean(),
@@ -100,6 +100,7 @@ export async function validateWordPair(word1: string, word2: string): Promise<Va
 
   if (!response) {
     debug.api.error('OpenAI response was null or aborted');
+    monitor.trackError('validate-word:openai');
     return {
       isValid: false,
       cached: false,

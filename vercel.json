@@ -4,5 +4,11 @@
     "src/app/api/**/*.ts": {
       "maxDuration": 30
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/cleanup-rooms",
+      "schedule": "0 * * * *"
+    }
+  ]
 }

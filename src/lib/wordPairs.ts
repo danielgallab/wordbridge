@@ -3,8 +3,9 @@ import { WORD_BANK, getWordBankSize } from './wordBank';
 import { getOpenAI } from '@/lib/openai';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import { z } from 'zod';
+import type { Difficulty } from '@/lib/constants';
 
-export type Difficulty = 'easy' | 'medium' | 'hard';
+export type { Difficulty };
 
 // Schema for AI-generated words to add to the bank
 const NewWordsResult = z.object({

@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
-import { generateWordPair, Difficulty } from '@/lib/wordPairs';
+import { generateWordPair } from '@/lib/wordPairs';
+import { ROOM_STATUS, DIFFICULTIES, type Difficulty } from '@/lib/constants';
+import { ApiError, withErrorHandler } from '@/lib/api-error';
+import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 
 // Characters that are visually distinct (no 0/O, 1/I/L confusion)
 const ROOM_CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -14,82 +17,97 @@ function generateRoomCode(): string {
 }
 
 // POST /api/rooms - Create a new room
-export async function POST(request: NextRequest) {
-  try {
-    const { playerName, difficulty = 'medium' } = await request.json() as { playerName?: string; difficulty?: Difficulty };
+export const POST = withErrorHandler('rooms/create', async (request: Request) => {
+  checkRateLimit(request as NextRequest, 'rooms/create', RATE_LIMITS.room);
 
-    if (!playerName?.trim()) {
-      return NextResponse.json({ error: 'Player name is required' }, { status: 400 });
-    }
+  const { playerName, difficulty = 'medium' } = await request.json() as { playerName?: string; difficulty?: Difficulty };
 
-    if (!['easy', 'medium', 'hard'].includes(difficulty)) {
-      return NextResponse.json({ error: 'Invalid difficulty' }, { status: 400 });
-    }
-
-    const supabase = createServiceClient();
-
-    // Generate a fresh random word pair using AI
-    const wordPair = await generateWordPair(supabase, difficulty);
-
-    // Generate unique room code
-    let code = generateRoomCode();
-    let attempts = 0;
-    while (attempts < 10) {
-      const { data: existing } = await supabase
-        .from('rooms')
-        .select('id')
-        .eq('code', code)
-        .single();
-
-      if (!existing) break;
-      code = generateRoomCode();
-      attempts++;
-    }
-
-    // Create the room (no word_pair_id - just store the words directly)
-    const { data: room, error: roomError } = await supabase
-      .from('rooms')
-      .insert({
-        code,
-        status: 'waiting',
-        start_word: wordPair.start_word,
-        target_word: wordPair.target_word,
-        difficulty,
-      })
-      .select()
-      .single();
-
-    if (roomError) {
-      console.error('Room creation error:', roomError);
-      return NextResponse.json({ error: 'Failed to create room' }, { status: 500 });
-    }
-
-    // Add the creator as first player
-    const { data: player, error: playerError } = await supabase
-      .from('room_players')
-      .insert({
-        room_id: room.id,
-        player_name: playerName.trim(),
-        chain: [wordPair.start_word],
-      })
-      .select()
-      .single();
-
-    if (playerError) {
-      console.error('Player creation error:', playerError);
-      return NextResponse.json({ error: 'Failed to join room' }, { status: 500 });
-    }
-
-    return NextResponse.json({
-      room,
-      player,
-      code: room.code,
-    });
-  } catch (error) {
-    console.error('Create room error:', error);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+  if (!playerName?.trim()) {
+    throw new ApiError({ code: 'BAD_REQUEST', message: 'Player name is required' });
   }
-}
+
+  if (!(DIFFICULTIES as readonly string[]).includes(difficulty)) {
+    throw new ApiError({ code: 'BAD_REQUEST', message: 'Invalid difficulty' });
+  }
+
+  const supabase = createServiceClient();
+
+  // Generate a fresh random word pair using AI
+  let wordPair;
+  try {
+    wordPair = await generateWordPair(supabase, difficulty);
+  } catch (err) {
+    throw new ApiError({
+      code: 'UPSTREAM_ERROR',
+      message: 'Failed to generate word pair — please try again',
+      detail: 'Word pair generation failed',
+      cause: err,
+    });
+  }
+
+  // Generate unique room code
+  let code = generateRoomCode();
+  let attempts = 0;
+  while (attempts < 10) {
+    const { data: existing } = await supabase
+      .from('rooms')
+      .select('id')
+      .eq('code', code)
+      .single();
+
+    if (!existing) break;
+    code = generateRoomCode();
+    attempts++;
+  }
+
+  // Create the room
+  const { data: room, error: roomError } = await supabase
+    .from('rooms')
+    .insert({
+      code,
+      status: ROOM_STATUS.WAITING,
+      start_word: wordPair.start_word,
+      target_word: wordPair.target_word,
+      difficulty,
+    })
+    .select()
+    .single();
+
+  if (roomError) {
+    throw new ApiError({
+      code: 'DATABASE_ERROR',
+      message: 'Failed to create room',
+      detail: 'rooms insert failed',
+      cause: roomError,
+    });
+  }
+
+  // Add the creator as first player
+  const { data: player, error: playerError } = await supabase
+    .from('room_players')
+    .insert({
+      room_id: room.id,
+      player_name: playerName.trim(),
+      chain: [wordPair.start_word],
+    })
+    .select()
+    .single();
+
+  if (playerError) {
+    throw new ApiError({
+      code: 'DATABASE_ERROR',
+      message: 'Failed to join room',
+      detail: 'room_players insert failed',
+      cause: playerError,
+    });
+  }
+
+  return NextResponse.json({
+    room,
+    player,
+    code: room.code,
+  });
+});
 
 // GET /api/rooms?code=XXXX - Get room by code
 export async function GET(request: NextRequest) {
@@ -97,7 +115,7 @@ export async function GET(request: NextRequest) {
     const code = request.nextUrl.searchParams.get('code');
 
     if (!code) {
-      return NextResponse.json({ error: 'Room code is required' }, { status: 400 });
+      return new ApiError({ code: 'BAD_REQUEST', message: 'Room code is required' }).toResponse();
     }
 
     const supabase = createServiceClient();
@@ -112,12 +130,11 @@ export async function GET(request: NextRequest) {
       .single();
 
     if (error || !room) {
-      return NextResponse.json({ error: 'Room not found' }, { status: 404 });
+      return new ApiError({ code: 'NOT_FOUND', message: 'Room not found' }).toResponse();
     }
 
     return NextResponse.json({ room });
-  } catch (error) {
-    console.error('Get room error:', error);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+  } catch {
+    return new ApiError({ code: 'SERVER_ERROR' }).toResponse();
   }
 }

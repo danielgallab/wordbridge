@@ -19,12 +19,13 @@ export interface WordAssociation {
   validated_at: string;
 }
 
-export type Difficulty = 'easy' | 'medium' | 'hard';
+import type { RoomStatus, Difficulty } from '@/lib/constants';
+export type { Difficulty };
 
 export interface Room {
   id: string;
   code: string;
-  status: 'waiting' | 'playing' | 'finished';
+  status: RoomStatus;
   start_word: string;
   target_word: string;
   time_limit: number;

@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 import type { DailyPuzzle, DailyCompletion, PlayerStats, LeaderboardEntry } from '@/types';
 import type { DailyData } from '@/lib/daily.server';
-import { REJECTION_MESSAGES, type RejectionReason } from '@/lib/constants';
 import { debug } from '@/lib/debug';
+import { normalizeWord, checkDuplicate, parseSubmissionError, flashError } from '@/lib/submission';
 
 // localStorage keys for persisting game progress
 const CHAIN_STORAGE_KEY = 'wordbridge_daily_chain';
@@ -296,24 +296,16 @@ export const useDailyStore = create<DailyState>((set, get) => ({
       return false;
     }
 
-    const normalizedWord = word.trim().toLowerCase();
-
-    // Don't allow duplicates
-    if (state.chain.includes(normalizedWord)) {
-      set({ error: `"${word}" is already in your chain` });
-      setTimeout(() => set({ error: null }), 2500);
+    const normalized = normalizeWord(word);
+    const dupeError = checkDuplicate(word, state.chain);
+    if (dupeError) {
+      flashError(set, dupeError);
       return false;
     }
 
     // Optimistic update
     const previousChain = state.chain;
-    const optimisticChain = [...previousChain, normalizedWord];
-
-    set({
-      isValidating: true,
-      error: null,
-      chain: optimisticChain,
-    });
+    set({ isValidating: true, error: null, chain: [...previousChain, normalized] });
 
     try {
       const response = await fetch('/api/daily/submit', {
@@ -322,7 +314,7 @@ export const useDailyStore = create<DailyState>((set, get) => ({
         body: JSON.stringify({
           sessionId: state.sessionId,
           puzzleId: state.puzzle.id,
-          word: normalizedWord,
+          word: normalized,
           currentChain: previousChain,
         }),
       });
@@ -330,15 +322,8 @@ export const useDailyStore = create<DailyState>((set, get) => ({
       const data = await response.json();
 
       if (!response.ok) {
-        // Rollback optimistic update and record failed attempt
-        const reason = data.reason as RejectionReason | undefined;
-        const errorMessage =
-          reason && REJECTION_MESSAGES[reason]
-            ? REJECTION_MESSAGES[reason]
-            : data.error || 'Failed to submit word';
         const newAttempts = [...state.attempts, { valid: false }];
         set({
-          error: errorMessage,
           isValidating: false,
           chain: previousChain,
           attempts: newAttempts,
@@ -347,7 +332,7 @@ export const useDailyStore = create<DailyState>((set, get) => ({
         if (state.puzzle) {
           saveAttemptsToStorage(state.puzzle.puzzle_date, newAttempts);
         }
-        setTimeout(() => set({ error: null }), 2500);
+        flashError(set, parseSubmissionError(data));
         return false;
       }
 
@@ -360,7 +345,6 @@ export const useDailyStore = create<DailyState>((set, get) => ({
         isValidating: false,
         isComplete: data.isComplete,
         hasCompletedToday: data.isComplete && !data.isPractice ? true : state.hasCompletedToday,
-        // Reset hints on successful word
         hintWords: [],
         showHints: false,
         rejectionCount: 0,
@@ -386,13 +370,8 @@ export const useDailyStore = create<DailyState>((set, get) => ({
 
       return true;
     } catch {
-      // Rollback on network error
-      set({
-        error: 'Network error. Please try again.',
-        isValidating: false,
-        chain: previousChain,
-      });
-      setTimeout(() => set({ error: null }), 2500);
+      set({ isValidating: false, chain: previousChain });
+      flashError(set, 'Network error. Please try again.');
       return false;
     }
   },

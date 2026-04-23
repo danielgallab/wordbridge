@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { LogIn } from 'lucide-react';
 import { GameArena } from '@/components/game';
 import { useGameStore } from '@/stores/gameStore';
+import { ROOM_STATUS } from '@/lib/constants';
 
 function getStoredPlayerId(code: string): string | null {
   try {
@@ -160,7 +161,7 @@ export default function PlayPage() {
   // Inline join form for new players
   if (needsJoin) {
     const roomStatus = roomData?.status;
-    const gameAlreadyStarted = roomStatus !== 'waiting';
+    const gameAlreadyStarted = roomStatus !== ROOM_STATUS.WAITING;
 
     return (
       <main className="flex-1 flex flex-col items-center justify-center p-4">

@@ -1,5 +1,7 @@
 // Shared constants for the WordBridge application
 
+// --- Rejection reasons ---
+
 export type RejectionReason =
   | 'not_related'
   | 'already_used'
@@ -21,5 +23,21 @@ export const REJECTION_MESSAGES: Record<RejectionReason, string> = {
   misspelled: 'Check spelling — did you mean something else?',
 };
 
-// Game timing
+// --- Room status ---
+
+export const ROOM_STATUS = {
+  WAITING: 'waiting',
+  PLAYING: 'playing',
+  FINISHED: 'finished',
+} as const;
+
+export type RoomStatus = (typeof ROOM_STATUS)[keyof typeof ROOM_STATUS];
+
+// --- Difficulty ---
+
+export const DIFFICULTIES = ['easy', 'medium', 'hard'] as const;
+export type Difficulty = (typeof DIFFICULTIES)[number];
+
+// --- Game timing ---
+
 export const DEFAULT_TIME_LIMIT = 90;

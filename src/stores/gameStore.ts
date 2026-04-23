@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import { REJECTION_MESSAGES, DEFAULT_TIME_LIMIT, type RejectionReason } from '@/lib/constants';
+import { DEFAULT_TIME_LIMIT, ROOM_STATUS, type RoomStatus } from '@/lib/constants';
 import { debug } from '@/lib/debug';
+import { normalizeWord, checkDuplicate, parseSubmissionError, flashError } from '@/lib/submission';
 
 const TOTAL_TIME = DEFAULT_TIME_LIMIT;
 
@@ -19,7 +20,7 @@ interface Player {
 interface Room {
   id: string;
   code: string;
-  status: 'waiting' | 'playing' | 'finished';
+  status: RoomStatus;
   start_word: string;
   target_word: string;
   time_limit: number;
@@ -156,7 +157,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   initGame: (room, playerId, players) => {
     const me = players.find(p => p.id === playerId);
-    const gameFinished = room.status === 'finished';
+    const gameFinished = room.status === ROOM_STATUS.FINISHED;
 
     // Determine if current player is host (first player by created_at)
     const sortedPlayers = [...players].sort(
@@ -166,7 +167,7 @@ export const useGameStore = create<GameState>((set, get) => ({
 
     // Calculate time remaining based on server start time if game is playing
     let timeLeft = room.time_limit || TOTAL_TIME;
-    if (room.status === 'playing' && room.started_at) {
+    if (room.status === ROOM_STATUS.PLAYING && room.started_at) {
       const elapsedSeconds = Math.floor((Date.now() - new Date(room.started_at).getTime()) / 1000);
       timeLeft = Math.max(0, (room.time_limit || TOTAL_TIME) - elapsedSeconds);
     }
@@ -190,29 +191,20 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   submitWord: async (word) => {
     const state = get();
-    // Use room.status to check if game is playing
-    if (!state.room || !state.playerId || state.room.status !== 'playing' || state.isValidating) {
+    if (!state.room || !state.playerId || state.room.status !== ROOM_STATUS.PLAYING || state.isValidating) {
       return false;
     }
 
-    const normalizedWord = word.trim().toLowerCase();
-
-    // Don't allow duplicates
-    if (state.myChain.includes(normalizedWord)) {
-      set({ error: `"${word}" is already in your chain` });
-      setTimeout(() => set({ error: null }), 2500);
+    const normalized = normalizeWord(word);
+    const dupeError = checkDuplicate(word, state.myChain);
+    if (dupeError) {
+      flashError(set, dupeError);
       return false;
     }
 
-    // Optimistic update: immediately add word to chain
+    // Optimistic update
     const previousChain = state.myChain;
-    const optimisticChain = [...previousChain, normalizedWord];
-
-    set({
-      isValidating: true,
-      error: null,
-      myChain: optimisticChain  // Show word immediately
-    });
+    set({ isValidating: true, error: null, myChain: [...previousChain, normalized] });
 
     try {
       const response = await fetch('/api/rooms/submit', {
@@ -221,25 +213,19 @@ export const useGameStore = create<GameState>((set, get) => ({
         body: JSON.stringify({
           roomId: state.room.id,
           playerId: state.playerId,
-          word: normalizedWord,
+          word: normalized,
         }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        // Rollback optimistic update on error and record failed attempt
-        const reason = data.reason as RejectionReason | undefined;
-        const errorMessage = reason && REJECTION_MESSAGES[reason]
-          ? REJECTION_MESSAGES[reason]
-          : (data.error || 'Failed to submit word');
         set({
-          error: errorMessage,
           isValidating: false,
           myChain: previousChain,
           myAttempts: [...state.myAttempts, { valid: false }],
         });
-        setTimeout(() => set({ error: null }), 2500);
+        flashError(set, parseSubmissionError(data));
         return false;
       }
 
@@ -256,13 +242,8 @@ export const useGameStore = create<GameState>((set, get) => ({
 
       return true;
     } catch {
-      // Rollback optimistic update on network error
-      set({
-        error: 'Network error. Please try again.',
-        isValidating: false,
-        myChain: previousChain  // Restore previous chain
-      });
-      setTimeout(() => set({ error: null }), 2500);
+      set({ isValidating: false, myChain: previousChain });
+      flashError(set, 'Network error. Please try again.');
       return false;
     }
   },
@@ -270,7 +251,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   tick: () => {
     const state = get();
     // Use room.status to check if game is playing, also check localGameEnded
-    if (state.room?.status !== 'playing' || state.localGameEnded) return state.timeLeft;
+    if (state.room?.status !== ROOM_STATUS.PLAYING || state.localGameEnded) return state.timeLeft;
 
     // Calculate time remaining from server timestamp to prevent drift
     let newTime: number;
