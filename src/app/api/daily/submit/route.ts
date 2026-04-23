@@ -155,8 +155,13 @@ async function handleWordSubmission(
   // Use the normalized word if AI provided one (e.g., "hands" -> "hand")
   const finalWord = validateData.normalizedWord || newWord;
 
+  if (validateData.normalizedWord) {
+    console.log(`[Submit] Normalization: "${newWord}" → "${finalWord}" (chain: ${currentChain.join(', ')})`);
+  }
+
   // Check if the normalized word is already in the chain
   if (currentChain.includes(finalWord)) {
+    console.log(`[Submit] BLOCKED: "${newWord}" normalized to "${finalWord}" which is already in chain`);
     return NextResponse.json({ error: 'Already used', reason: 'already_used' }, { status: 400 });
   }
 

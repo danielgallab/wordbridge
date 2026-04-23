@@ -182,7 +182,8 @@ async function expandWordBank(
   const openai = getOpenAI();
 
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
+    model: 'gpt-5-nano',
+    reasoning_effort: 'minimal',
     messages: [
       {
         role: 'system',

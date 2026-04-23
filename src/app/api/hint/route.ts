@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getOpenAI, HINT_GENERATION_PROMPT } from '@/lib/openai';
+import { validateWordPair } from '@/lib/validate-word';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import { z } from 'zod';
 import { debug } from '@/lib/debug';
@@ -9,40 +10,6 @@ import { debug } from '@/lib/debug';
 const HintWordsResult = z.object({
   words: z.array(z.string()),
 });
-
-// Validation logic (extracted from validate-word route)
-async function validateWordPair(word1: string, word2: string): Promise<boolean> {
-  const openai = getOpenAI();
-
-  const ValidationResult = z.object({
-    r: z.boolean(),
-  });
-
-  try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: `Word association validator. Return r:true if words are directly connected (8/10 people would instantly see connection). Valid: synonyms, associations (coffee/cup), properties (fire/hot), part-whole (wheel/car). Invalid: multi-hop reasoning, broad categories only.`
-        },
-        { role: 'user', content: `${word1},${word2}` },
-      ],
-      response_format: zodResponseFormat(ValidationResult, 'validation'),
-      max_completion_tokens: 10,
-      temperature: 0,
-    });
-
-    const content = response.choices[0]?.message?.content;
-    if (content) {
-      const parsed = JSON.parse(content);
-      return parsed.r === true;
-    }
-    return false;
-  } catch {
-    return false;
-  }
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -86,7 +53,7 @@ export async function POST(request: NextRequest) {
 
     // Step 3: Need more hints - generate with OpenAI and validate
     const openai = getOpenAI();
-
+    
     const candidateResponse = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
@@ -98,7 +65,6 @@ export async function POST(request: NextRequest) {
       ],
       response_format: zodResponseFormat(HintWordsResult, 'hints'),
       max_completion_tokens: 100,
-      temperature: 0.7,
     });
 
     const candidateContent = candidateResponse.choices[0]?.message?.content;
@@ -111,7 +77,7 @@ export async function POST(request: NextRequest) {
       } catch {
         debug.api.error('Failed to parse hint candidates');
       }
-    }
+    }    
 
     // Filter candidates
     candidates = candidates
@@ -127,8 +93,8 @@ export async function POST(request: NextRequest) {
 
     // Step 4: Validate each candidate (in parallel, limit to 8)
     const validationPromises = candidates.slice(0, 8).map(async (candidate) => {
-      const isValid = await validateWordPair(word, candidate);
-      return { word: candidate, isValid };
+      const result = await validateWordPair(word, candidate);
+      return { word: candidate, isValid: result.isValid };
     });
 
     const validationResults = await Promise.all(validationPromises);
