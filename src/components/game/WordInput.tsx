@@ -56,6 +56,8 @@ export const WordInput = forwardRef<WordInputHandle, WordInputProps>(
     if (trimmed && !disabled && !isValidating) {
       lastSubmitRef.current = now;
       setValue('');
+      // Re-focus immediately so iOS keeps the keyboard open (user gesture context)
+      inputRef.current?.focus();
       onSubmit(trimmed);
     }
   }, [value, disabled, isValidating, onSubmit]);
