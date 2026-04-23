@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
+import { generateShareCode } from '@/lib/shareCode';
 
 // POST /api/daily/submit - Submit a word to the daily challenge or practice mode
 export async function POST(request: NextRequest) {
@@ -62,6 +63,7 @@ export async function POST(request: NextRequest) {
 
       // Insert completion with ON CONFLICT to handle race conditions
       // If another request completed first, this will be a no-op
+      const shareCode = generateShareCode();
       const { data: insertedCompletion, error: insertError } = await supabase
         .from('daily_completions')
         .upsert(
@@ -70,13 +72,14 @@ export async function POST(request: NextRequest) {
             session_id: sessionId,
             chain: newChain,
             word_count: wordCount,
+            share_code: shareCode,
           },
           {
             onConflict: 'puzzle_id,session_id',
             ignoreDuplicates: true,
           }
         )
-        .select('id')
+        .select('id, share_code')
         .maybeSingle();
 
       // Only update stats if we actually inserted (not a duplicate)
@@ -90,6 +93,7 @@ export async function POST(request: NextRequest) {
         isComplete: true,
         wordCount,
         isPractice: false,
+        shareCode: insertedCompletion.share_code,
       });
     }
 

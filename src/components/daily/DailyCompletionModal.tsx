@@ -6,9 +6,9 @@ import { useDailyStore } from '@/stores/dailyStore';
 import { DailyLeaderboard } from './DailyLeaderboard';
 import { DailyStats } from './DailyStats';
 import { NameInputModal } from './NameInputModal';
-import { encodeChallenge, type ChallengeData } from '@/lib/challenge';
 import type { DailyPuzzle } from '@/types';
 import type { PathQuality } from '@/lib/scoring';
+import type { ShareCompletion } from '@/lib/daily.server';
 import Link from 'next/link';
 
 interface DailyCompletionModalProps {
@@ -16,7 +16,7 @@ interface DailyCompletionModalProps {
   chain: string[];
   attempts: { valid: boolean }[];
   pathQuality: { rating: PathQuality; emoji: string; description: string } | null;
-  challengeData?: ChallengeData | null;
+  shareData?: ShareCompletion | null;
   alreadyCompleted?: boolean;
 }
 
@@ -25,10 +25,10 @@ export function DailyCompletionModal({
   chain,
   attempts,
   pathQuality,
-  challengeData,
+  shareData,
   alreadyCompleted,
 }: DailyCompletionModalProps) {
-  const { loadLeaderboard, stats, sessionId, previousCompletion } = useDailyStore();
+  const { loadLeaderboard, stats, sessionId, previousCompletion, shareCode } = useDailyStore();
   const [shareStatus, setShareStatus] = useState<'idle' | 'copied'>('idle');
   // Show name input only when just completed AND doesn't already have a name saved
   const hasExistingName = !!(stats?.playerName || previousCompletion?.playerName);
@@ -83,15 +83,16 @@ export function DailyCompletionModal({
     const attemptLine = `${puzzle.start_word.toUpperCase()} → ${attemptIcons} → ${puzzle.target_word.toUpperCase()}`;
     const missteps = attempts.filter(a => !a.valid).length;
 
-    // Encode challenge data into URL so recipient sees our path after completing
-    const challengeCode = encodeChallenge({ chain, attempts });
-    const challengeUrl = `https://wordbridge.danielgallab.com/?challenge=${challengeCode}`;
+    // Use completion ID for short share URL
+    const shareUrl = shareCode
+      ? `https://wordbridge.danielgallab.com/?share=${shareCode}`
+      : `https://wordbridge.danielgallab.com`;
 
     const shareText =
       `WordBridge Daily #${puzzleNumber}\n\n` +
       `${attemptLine} ${pathQuality?.emoji || ''}\n\n` +
       `I bridged it in ${wordCount} words with ${missteps} misstep${missteps === 1 ? '' : 's'}. Can you beat that?\n\n` +
-      challengeUrl;
+      shareUrl;
 
     try {
       if (navigator.share) {
@@ -154,17 +155,17 @@ export function DailyCompletionModal({
           </div>
         </div>
 
-        {/* Challenger's Path - shown when opened from a share link */}
-        {challengeData && (
+        {/* Sharer's Path - shown when opened from a share link */}
+        {shareData && (
           <div className="bg-[var(--background)] rounded-lg p-3 mb-4 border border-[var(--border)]">
             <div className="text-xs uppercase tracking-wider text-[var(--text-muted)] font-bold mb-2">
-              Their Solution
+              {shareData.playerName ? `${shareData.playerName}'s Solution` : 'Their Solution'}
             </div>
             <div className="font-mono text-sm text-[var(--text-muted)] break-words">
-              {challengeData.chain.join(' → ')}
+              {shareData.chain.join(' → ')}
             </div>
             <div className="text-xs text-[var(--text-muted)] mt-2">
-              {challengeData.chain.length} words &middot; {challengeData.attempts.filter(a => !a.valid).length} misstep{challengeData.attempts.filter(a => !a.valid).length === 1 ? '' : 's'}
+              {shareData.wordCount} words
             </div>
           </div>
         )}

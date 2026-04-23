@@ -71,6 +71,7 @@ export interface DailyCompletion {
   wordCount: number;
   completedAt: string;
   playerName?: string | null;
+  shareCode?: string | null;
 }
 
 export interface PlayerStats {
@@ -84,6 +85,7 @@ export interface PlayerStats {
 
 export interface LeaderboardEntry {
   rank: number;
+  sessionId: string;
   playerName: string;
   wordCount: number;
   completedAt: string;

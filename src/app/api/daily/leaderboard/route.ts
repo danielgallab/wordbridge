@@ -50,6 +50,7 @@ export async function GET(request: NextRequest) {
     // Include chain only for top 5 entries
     const leaderboard = (completions || []).map((entry: { session_id: string; player_name: string | null; word_count: number; completed_at: string; chain: string[] }, index: number) => ({
       rank: index + 1,
+      sessionId: entry.session_id,
       playerName: entry.player_name || 'Anonymous',
       wordCount: entry.word_count,
       completedAt: entry.completed_at,

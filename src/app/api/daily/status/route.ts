@@ -68,6 +68,7 @@ export async function GET(request: NextRequest) {
             wordCount: completion.word_count,
             completedAt: completion.completed_at,
             playerName: completion.player_name,
+            shareCode: completion.share_code,
           }
         : null,
       stats: stats

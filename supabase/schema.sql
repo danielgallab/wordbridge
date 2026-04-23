@@ -107,6 +107,7 @@ CREATE TABLE IF NOT EXISTS daily_completions (
   player_name TEXT,
   chain JSONB NOT NULL,
   word_count INT NOT NULL,
+  share_code TEXT UNIQUE,
   completed_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(puzzle_id, session_id)
 );

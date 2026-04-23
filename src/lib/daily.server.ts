@@ -2,6 +2,35 @@ import { createServiceClient } from '@/lib/supabase/server';
 import type { DailyPuzzle, DailyCompletion, PlayerStats } from '@/types';
 import { generateWordPair } from '@/lib/wordPairs';
 
+export interface ShareCompletion {
+  chain: string[];
+  wordCount: number;
+  playerName: string | null;
+}
+
+export async function getShareCompletion(code: string): Promise<ShareCompletion | null> {
+  try {
+    if (!code || code.length > 10) return null;
+
+    const supabase = createServiceClient();
+    const { data } = await supabase
+      .from('daily_completions')
+      .select('chain, word_count, player_name')
+      .eq('share_code', code)
+      .single();
+
+    if (!data) return null;
+
+    return {
+      chain: data.chain,
+      wordCount: data.word_count,
+      playerName: data.player_name,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export interface PracticeData {
   puzzle: {
     start_word: string;
@@ -137,6 +166,7 @@ export async function getDailyData(sessionId: string): Promise<DailyData | null>
             chain: dbCompletion.chain,
             wordCount: dbCompletion.word_count,
             completedAt: dbCompletion.completed_at,
+            shareCode: dbCompletion.share_code,
           }
         : null,
       stats: dbStats

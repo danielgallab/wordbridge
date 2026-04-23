@@ -13,15 +13,14 @@ import { DailyCompletionModal } from './DailyCompletionModal';
 import { calculatePathQuality } from '@/lib/scoring';
 import { useSoundEffects } from '@/hooks/useSoundEffects';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
-import type { DailyData } from '@/lib/daily.server';
-import type { ChallengeData } from '@/lib/challenge';
+import type { DailyData, ShareCompletion } from '@/lib/daily.server';
 
 interface DailyChallengeProps {
   initialData: DailyData | null;
-  challengeData?: ChallengeData | null;
+  shareData?: ShareCompletion | null;
 }
 
-export function DailyChallenge({ initialData, challengeData }: DailyChallengeProps) {
+export function DailyChallenge({ initialData, shareData }: DailyChallengeProps) {
   const initialized = useRef(false);
   const prevChainLengthRef = useRef(0);
   const prevErrorRef = useRef<string | null>(null);
@@ -135,7 +134,7 @@ export function DailyChallenge({ initialData, challengeData }: DailyChallengePro
         chain={chain}
         attempts={attempts}
         pathQuality={pathQuality}
-        challengeData={challengeData}
+        shareData={shareData}
       />
     );
   }
@@ -148,7 +147,7 @@ export function DailyChallenge({ initialData, challengeData }: DailyChallengePro
         chain={chain}
         attempts={attempts}
         pathQuality={pathQuality}
-        challengeData={challengeData}
+        shareData={shareData}
         alreadyCompleted
       />
     );

@@ -4,36 +4,39 @@ import type { DailyData } from '@/lib/daily.server';
 import { REJECTION_MESSAGES, type RejectionReason } from '@/lib/constants';
 import { debug } from '@/lib/debug';
 
-// localStorage key for persisting in-progress chain
+// localStorage keys for persisting game progress
 const CHAIN_STORAGE_KEY = 'wordbridge_daily_chain';
+const ATTEMPTS_STORAGE_KEY = 'wordbridge_daily_attempts';
 
 interface StoredChain {
   puzzleDate: string;
   chain: string[];
-  attempts?: { valid: boolean }[];
 }
 
-function saveChainToStorage(puzzleDate: string, chain: string[], attempts?: { valid: boolean }[]): void {
+interface StoredAttempts {
+  puzzleDate: string;
+  attempts: { valid: boolean }[];
+}
+
+function saveChainToStorage(puzzleDate: string, chain: string[]): void {
   if (typeof window === 'undefined') return;
   try {
-    const data: StoredChain = { puzzleDate, chain, attempts };
+    const data: StoredChain = { puzzleDate, chain };
     localStorage.setItem(CHAIN_STORAGE_KEY, JSON.stringify(data));
   } catch {
     // localStorage might be unavailable or full
   }
 }
 
-function loadChainFromStorage(puzzleDate: string): { chain: string[]; attempts: { valid: boolean }[] } | null {
+function loadChainFromStorage(puzzleDate: string): string[] | null {
   if (typeof window === 'undefined') return null;
   try {
     const stored = localStorage.getItem(CHAIN_STORAGE_KEY);
     if (!stored) return null;
     const data: StoredChain = JSON.parse(stored);
-    // Only return chain if it's for today's puzzle
     if (data.puzzleDate === puzzleDate) {
-      return { chain: data.chain, attempts: data.attempts || [] };
+      return data.chain;
     }
-    // Clear stale data from previous days
     localStorage.removeItem(CHAIN_STORAGE_KEY);
     return null;
   } catch {
@@ -50,12 +53,40 @@ function clearChainStorage(): void {
   }
 }
 
+// Attempts persist separately so they survive completion (needed for share text)
+function saveAttemptsToStorage(puzzleDate: string, attempts: { valid: boolean }[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const data: StoredAttempts = { puzzleDate, attempts };
+    localStorage.setItem(ATTEMPTS_STORAGE_KEY, JSON.stringify(data));
+  } catch {
+    // localStorage might be unavailable or full
+  }
+}
+
+function loadAttemptsFromStorage(puzzleDate: string): { valid: boolean }[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const stored = localStorage.getItem(ATTEMPTS_STORAGE_KEY);
+    if (!stored) return [];
+    const data: StoredAttempts = JSON.parse(stored);
+    if (data.puzzleDate === puzzleDate) {
+      return data.attempts;
+    }
+    localStorage.removeItem(ATTEMPTS_STORAGE_KEY);
+    return [];
+  } catch {
+    return [];
+  }
+}
+
 
 interface DailyState {
   // Puzzle state
   puzzle: DailyPuzzle | null;
   chain: string[];
   attempts: { valid: boolean }[];
+  shareCode: string | null;
   isComplete: boolean;
   hasCompletedToday: boolean;
 
@@ -102,6 +133,7 @@ export const useDailyStore = create<DailyState>((set, get) => ({
   puzzle: null,
   chain: [],
   attempts: [],
+  shareCode: null,
   isComplete: false,
   hasCompletedToday: false,
   previousCompletion: null,
@@ -125,24 +157,18 @@ export const useDailyStore = create<DailyState>((set, get) => ({
 
   initializeWithData: (data, sessionId) => {
     let chain: string[];
-    let attempts: { valid: boolean }[] = [];
+    const attempts = loadAttemptsFromStorage(data.puzzle.puzzle_date);
 
     if (data.hasCompletedToday && data.completion) {
       // User already completed today's puzzle - show their solution
       chain = data.completion.chain;
-      // Load attempts from storage if available (for share display)
-      const saved = loadChainFromStorage(data.puzzle.puzzle_date);
-      if (saved) attempts = saved.attempts;
       clearChainStorage();
     } else {
       // Check for saved progress from localStorage
-      const saved = loadChainFromStorage(data.puzzle.puzzle_date);
-      if (saved && saved.chain.length > 0 && saved.chain[0] === data.puzzle.start_word) {
-        // Restore saved progress
-        chain = saved.chain;
-        attempts = saved.attempts;
+      const savedChain = loadChainFromStorage(data.puzzle.puzzle_date);
+      if (savedChain && savedChain.length > 0 && savedChain[0] === data.puzzle.start_word) {
+        chain = savedChain;
       } else {
-        // Start fresh
         chain = [data.puzzle.start_word];
       }
     }
@@ -151,6 +177,7 @@ export const useDailyStore = create<DailyState>((set, get) => ({
       puzzle: data.puzzle,
       chain,
       attempts,
+      shareCode: data.completion?.shareCode ?? null,
       isComplete: data.hasCompletedToday,
       hasCompletedToday: data.hasCompletedToday,
       previousCompletion: data.completion,
@@ -187,18 +214,15 @@ export const useDailyStore = create<DailyState>((set, get) => ({
       }
 
       let chain: string[];
-      let attempts: { valid: boolean }[] = [];
+      const attempts = loadAttemptsFromStorage(puzzle.puzzle_date);
       if (statusData?.hasCompleted && statusData?.completion) {
         chain = statusData.completion.chain;
-        const saved = loadChainFromStorage(puzzle.puzzle_date);
-        if (saved) attempts = saved.attempts;
         clearChainStorage();
       } else {
         // Check for saved progress
-        const saved = loadChainFromStorage(puzzle.puzzle_date);
-        if (saved && saved.chain.length > 0 && saved.chain[0] === puzzle.start_word) {
-          chain = saved.chain;
-          attempts = saved.attempts;
+        const savedChain = loadChainFromStorage(puzzle.puzzle_date);
+        if (savedChain && savedChain.length > 0 && savedChain[0] === puzzle.start_word) {
+          chain = savedChain;
         } else {
           chain = [puzzle.start_word];
         }
@@ -235,6 +259,7 @@ export const useDailyStore = create<DailyState>((set, get) => ({
         set({
           hasCompletedToday: data.hasCompleted,
           previousCompletion: data.completion,
+          shareCode: data.completion?.shareCode ?? get().shareCode,
           stats: data.stats,
           // If already completed, show their solution
           chain: data.hasCompleted && data.completion ? data.completion.chain : get().chain,
@@ -251,7 +276,7 @@ export const useDailyStore = create<DailyState>((set, get) => ({
     if (!puzzle) return;
 
     try {
-      const response = await fetch(`/api/daily/leaderboard?puzzleId=${puzzle.id}&limit=10`);
+      const response = await fetch(`/api/daily/leaderboard?puzzleId=${puzzle.id}&limit=50`);
       const data = await response.json();
 
       if (response.ok) {
@@ -319,9 +344,8 @@ export const useDailyStore = create<DailyState>((set, get) => ({
           attempts: newAttempts,
           rejectionCount: state.rejectionCount + 1,
         });
-        // Save attempts to localStorage
         if (state.puzzle) {
-          saveChainToStorage(state.puzzle.puzzle_date, previousChain, newAttempts);
+          saveAttemptsToStorage(state.puzzle.puzzle_date, newAttempts);
         }
         setTimeout(() => set({ error: null }), 2500);
         return false;
@@ -332,6 +356,7 @@ export const useDailyStore = create<DailyState>((set, get) => ({
       set({
         chain: data.chain,
         attempts: newAttempts,
+        shareCode: data.shareCode ?? state.shareCode,
         isValidating: false,
         isComplete: data.isComplete,
         hasCompletedToday: data.isComplete && !data.isPractice ? true : state.hasCompletedToday,
@@ -342,9 +367,14 @@ export const useDailyStore = create<DailyState>((set, get) => ({
         lastWordTimestamp: Date.now(),
       });
 
-      // Save progress to localStorage (only for non-complete attempts)
+      // Save attempts (persists across reloads, even after completion)
+      if (state.puzzle) {
+        saveAttemptsToStorage(state.puzzle.puzzle_date, newAttempts);
+      }
+
+      // Save chain progress to localStorage (only for non-complete games)
       if (!data.isComplete && state.puzzle) {
-        saveChainToStorage(state.puzzle.puzzle_date, data.chain, newAttempts);
+        saveChainToStorage(state.puzzle.puzzle_date, data.chain);
       }
 
       // If completed, clear localStorage and load leaderboard/stats
@@ -372,6 +402,7 @@ export const useDailyStore = create<DailyState>((set, get) => ({
       puzzle: null,
       chain: [],
       attempts: [],
+      shareCode: null,
       isComplete: false,
       hasCompletedToday: false,
       previousCompletion: null,

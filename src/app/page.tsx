@@ -1,12 +1,11 @@
 import { DailyChallenge } from '@/components/daily';
 import { getSessionId } from '@/lib/sessionId.server';
-import { getDailyData } from '@/lib/daily.server';
+import { getDailyData, getShareCompletion } from '@/lib/daily.server';
 import { HomeClient } from '@/components/HomeClient';
-import { decodeChallenge } from '@/lib/challenge';
-import type { ChallengeData } from '@/lib/challenge';
+import type { ShareCompletion } from '@/lib/daily.server';
 
 interface HomeProps {
-  searchParams: Promise<{ challenge?: string }>;
+  searchParams: Promise<{ share?: string }>;
 }
 
 export default async function Home({ searchParams }: HomeProps) {
@@ -14,10 +13,10 @@ export default async function Home({ searchParams }: HomeProps) {
   const sessionId = await getSessionId();
   const dailyData = await getDailyData(sessionId);
 
-  // Decode challenge data from share link if present
-  let challengeData: ChallengeData | null = null;
-  if (params.challenge) {
-    challengeData = decodeChallenge(params.challenge);
+  // Fetch shared completion if share ID is in the URL
+  let shareData: ShareCompletion | null = null;
+  if (params.share) {
+    shareData = await getShareCompletion(params.share);
   }
 
   return (
@@ -35,7 +34,7 @@ export default async function Home({ searchParams }: HomeProps) {
         </p>
 
         {/* Daily Challenge */}
-        <DailyChallenge initialData={dailyData} challengeData={challengeData} />
+        <DailyChallenge initialData={dailyData} shareData={shareData} />
 
         {/* Footer links */}
         <HomeClient />

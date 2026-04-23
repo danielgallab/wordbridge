@@ -5,7 +5,7 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useDailyStore } from '@/stores/dailyStore';
 
 export function DailyLeaderboard() {
-  const { leaderboard, totalCompletions } = useDailyStore();
+  const { leaderboard, totalCompletions, sessionId } = useDailyStore();
   const [expandedRank, setExpandedRank] = useState<number | null>(null);
 
   if (leaderboard.length === 0) {
@@ -15,6 +15,10 @@ export function DailyLeaderboard() {
   const toggleExpand = (rank: number) => {
     setExpandedRank(expandedRank === rank ? null : rank);
   };
+
+  // Each row is ~36px (py-1.5 + text). 5 rows ≈ 180px.
+  const ROW_HEIGHT = 36;
+  const VISIBLE_ROWS = 5;
 
   return (
     <div className="bg-[var(--background)] rounded-lg p-3 mb-4">
@@ -26,8 +30,11 @@ export function DailyLeaderboard() {
           {totalCompletions} {totalCompletions === 1 ? 'player' : 'players'}
         </div>
       </div>
-      <div className="space-y-1">
-        {leaderboard.slice(0, 5).map((entry) => (
+      <div
+        className="space-y-1 overflow-y-auto"
+        style={{ maxHeight: ROW_HEIGHT * VISIBLE_ROWS }}
+      >
+        {leaderboard.map((entry) => (
           <div key={`${entry.rank}-${entry.completedAt}`}>
             <button
               onClick={() => entry.chain && toggleExpand(entry.rank)}
@@ -49,8 +56,8 @@ export function DailyLeaderboard() {
                 >
                   {entry.rank}
                 </span>
-                <span className="text-sm text-[var(--text)]">
-                  {entry.playerName}
+                <span className={`text-sm ${entry.sessionId === sessionId ? 'font-bold text-[var(--present)]' : 'text-[var(--text)]'}`}>
+                  {entry.sessionId === sessionId ? 'You' : entry.playerName}
                 </span>
               </div>
               <div className="flex items-center gap-1">
