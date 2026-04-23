@@ -11,7 +11,7 @@ export function Footer() {
           <a
             href="https://danielgallab.com"
             target="_blank"
-            rel="noopener noreferrer"
+            rel="noopener author"
             className="hover:text-[var(--text)] transition-colors underline"
           >
             Daniel Elgallab

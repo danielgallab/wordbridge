@@ -14,8 +14,11 @@ export default async function Home() {
         <h1 className="text-3xl sm:text-4xl font-bold text-center mb-2 tracking-tight">
           WORDBRIDGE
         </h1>
-        <p className="text-center text-[var(--text-muted)] text-xs sm:text-sm mb-6 sm:mb-8">
+        <p className="text-center text-[var(--text-muted)] text-xs sm:text-sm mb-1">
           Connect words in the shortest chain
+        </p>
+        <p className="text-center text-[var(--text-muted)] text-[10px] sm:text-xs mb-6 sm:mb-8 opacity-70">
+          A free daily word chain puzzle game
         </p>
 
         {/* Daily Challenge */}

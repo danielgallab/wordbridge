@@ -4,6 +4,3 @@ Allow: /
 
 # Sitemap location
 Sitemap: https://wordbridge.danielgallab.com/sitemap.xml
-
-# Crawl-delay for respectful crawling
-Crawl-delay: 1

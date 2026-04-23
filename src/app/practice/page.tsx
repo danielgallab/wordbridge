@@ -5,8 +5,9 @@ import { getPracticeData } from '@/lib/daily.server';
 export const dynamic = 'force-dynamic';
 
 export const metadata = {
-  title: 'Practice Mode - WORDBRIDGE',
-  description: 'Practice word association with unlimited random puzzles',
+  title: 'Practice Mode - Unlimited Word Chain Puzzles',
+  description:
+    'Practice your word chain skills with unlimited random puzzles in WordBridge. No daily limit — play as many word association puzzles as you want, for free.',
 };
 
 export default async function PracticePage() {

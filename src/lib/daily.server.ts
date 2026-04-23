@@ -34,56 +34,57 @@ export interface DailyData {
   stats: PlayerStats | null;
 }
 
+async function fetchOrCreatePuzzle(supabase: ReturnType<typeof createServiceClient>, today: string): Promise<DailyPuzzle | null> {
+  const { data: existingPuzzle, error: fetchError } = await supabase
+    .from('daily_puzzles')
+    .select('*')
+    .eq('puzzle_date', today)
+    .single();
+
+  if (existingPuzzle) {
+    return existingPuzzle;
+  }
+
+  if (fetchError && fetchError.code !== 'PGRST116') {
+    return null;
+  }
+
+  // No puzzle for today - generate one
+  const wordPair = await generateWordPair(supabase, 'medium');
+
+  const { data: newPuzzle, error: insertError } = await supabase
+    .from('daily_puzzles')
+    .insert({
+      puzzle_date: today,
+      start_word: wordPair.start_word,
+      target_word: wordPair.target_word,
+      difficulty: 'medium',
+    })
+    .select()
+    .single();
+
+  if (insertError?.code === '23505') {
+    // Race condition - fetch the one that was created
+    const { data: racePuzzle } = await supabase
+      .from('daily_puzzles')
+      .select('*')
+      .eq('puzzle_date', today)
+      .single();
+    return racePuzzle;
+  }
+
+  return newPuzzle;
+}
+
 export async function getDailyData(sessionId: string): Promise<DailyData | null> {
   try {
     const supabase = createServiceClient();
     const today = new Date().toISOString().split('T')[0];
 
-    // Fetch puzzle (create if doesn't exist)
-    let puzzle: DailyPuzzle | null = null;
-
-    const { data: existingPuzzle, error: fetchError } = await supabase
-      .from('daily_puzzles')
-      .select('*')
-      .eq('puzzle_date', today)
-      .single();
-
-    if (existingPuzzle) {
-      puzzle = existingPuzzle;
-    } else if (!fetchError || fetchError.code === 'PGRST116') {
-      // No puzzle for today - generate one
-      const wordPair = await generateWordPair(supabase, 'medium');
-
-      const { data: newPuzzle, error: insertError } = await supabase
-        .from('daily_puzzles')
-        .insert({
-          puzzle_date: today,
-          start_word: wordPair.start_word,
-          target_word: wordPair.target_word,
-          difficulty: 'medium',
-        })
-        .select()
-        .single();
-
-      if (insertError?.code === '23505') {
-        // Race condition - fetch the one that was created
-        const { data: racePuzzle } = await supabase
-          .from('daily_puzzles')
-          .select('*')
-          .eq('puzzle_date', today)
-          .single();
-        puzzle = racePuzzle;
-      } else if (newPuzzle) {
-        puzzle = newPuzzle;
-      }
-    }
-
-    if (!puzzle) {
-      return null;
-    }
-
-    // If no session, return puzzle only
+    // If no session, just fetch puzzle
     if (!sessionId) {
+      const puzzle = await fetchOrCreatePuzzle(supabase, today);
+      if (!puzzle) return null;
       return {
         puzzle,
         sessionId: '',
@@ -93,36 +94,38 @@ export async function getDailyData(sessionId: string): Promise<DailyData | null>
       };
     }
 
-    // Fetch completion and stats in parallel
-    const [completionResult, statsResult] = await Promise.all([
-      supabase
-        .from('daily_completions')
-        .select('*')
-        .eq('puzzle_id', puzzle.id)
-        .eq('session_id', sessionId)
-        .single(),
+    // Fetch puzzle and session-independent data in parallel
+    const [puzzle, statsResult, avgResult] = await Promise.all([
+      fetchOrCreatePuzzle(supabase, today),
       supabase
         .from('player_stats')
         .select('*')
         .eq('session_id', sessionId)
         .single(),
-    ]);
-
-    const dbCompletion = completionResult.data;
-    const dbStats = statsResult.data;
-
-    // Calculate average word count if we have stats
-    let averageWordCount: number | null = null;
-    if (dbStats && dbStats.total_completions > 0) {
-      const { data: completions } = await supabase
+      supabase
         .from('daily_completions')
         .select('word_count')
-        .eq('session_id', sessionId);
+        .eq('session_id', sessionId),
+    ]);
 
-      if (completions && completions.length > 0) {
-        const total = completions.reduce((sum: number, c: { word_count: number }) => sum + c.word_count, 0);
-        averageWordCount = Math.round((total / completions.length) * 10) / 10;
-      }
+    if (!puzzle) return null;
+
+    // Now fetch completion (needs puzzle.id)
+    const { data: dbCompletion } = await supabase
+      .from('daily_completions')
+      .select('*')
+      .eq('puzzle_id', puzzle.id)
+      .eq('session_id', sessionId)
+      .single();
+
+    const dbStats = statsResult.data;
+
+    // Calculate average word count
+    let averageWordCount: number | null = null;
+    const completions = avgResult.data;
+    if (completions && completions.length > 0) {
+      const total = completions.reduce((sum: number, c: { word_count: number }) => sum + c.word_count, 0);
+      averageWordCount = Math.round((total / completions.length) * 10) / 10;
     }
 
     return {

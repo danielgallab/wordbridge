@@ -5,22 +5,29 @@ import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 
-const title = 'Word Bridge - Daily Word Chain Puzzle Game';
+const title = 'WordBridge - Daily Word Chain Puzzle Game by Daniel Elgallab';
 const description =
-  'Connect words in the shortest chain possible. Play the Daily Challenge or battle against friends in this addictive word puzzle game. Free online word game with unlimited practice mode.';
+  'WordBridge is a free online word chain puzzle game by Daniel Elgallab. Connect words in the shortest chain possible! Play the Daily Challenge, practice with unlimited puzzles, or battle friends in multiplayer mode.';
 const keywords = [
+  'wordbridge',
+  'word bridge',
+  'word bridge game',
   'word game',
   'word puzzle',
   'word chain',
-  'word bridge',
-  'daily puzzle',
-  'word association',
+  'word chain game',
+  'daily word puzzle',
+  'word association game',
   'vocabulary game',
   'brain teaser',
   'word challenge',
   'online word game',
   'free word game',
   'multiplayer word game',
+  'daniel elgallab',
+  'word bridge daniel elgallab',
+  'daily word game',
+  'word connection game',
 ];
 const siteUrl = 'https://wordbridge.danielgallab.com';
 
@@ -47,7 +54,7 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'en_US',
     url: siteUrl,
-    siteName: 'Word Bridge',
+    siteName: 'WordBridge',
     images: [
       {
         url: '/opengraph-image',
@@ -117,34 +124,54 @@ export default function RootLayout({
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              '@context': 'https://schema.org',
-              '@type': 'WebApplication',
-              name: 'Word Bridge',
-              applicationCategory: 'Game',
-              operatingSystem: 'Any',
-              offers: {
-                '@type': 'Offer',
-                price: '0',
-                priceCurrency: 'USD',
+            __html: JSON.stringify([
+              {
+                '@context': 'https://schema.org',
+                '@type': 'WebSite',
+                name: 'WordBridge',
+                alternateName: ['Word Bridge', 'WordBridge Game'],
+                url: 'https://wordbridge.danielgallab.com',
+                description:
+                  'WordBridge is a free online word chain puzzle game. Connect words in the shortest chain possible!',
+                creator: {
+                  '@type': 'Person',
+                  name: 'Daniel Elgallab',
+                  url: 'https://danielgallab.com',
+                },
+                inLanguage: 'en-US',
               },
-              aggregateRating: {
-                '@type': 'AggregateRating',
-                ratingValue: '4.8',
-                ratingCount: '1250',
+              {
+                '@context': 'https://schema.org',
+                '@type': 'WebApplication',
+                name: 'WordBridge',
+                alternateName: 'Word Bridge',
+                applicationCategory: 'GameApplication',
+                operatingSystem: 'Any',
+                browserRequirements: 'Requires a modern web browser',
+                offers: {
+                  '@type': 'Offer',
+                  price: '0',
+                  priceCurrency: 'USD',
+                },
+                description:
+                  'WordBridge is a free online word chain puzzle game by Daniel Elgallab. Connect words in the shortest chain possible! Play daily challenges, practice mode, or multiplayer.',
+                url: 'https://wordbridge.danielgallab.com',
+                image: 'https://wordbridge.danielgallab.com/opengraph-image',
+                author: {
+                  '@type': 'Person',
+                  name: 'Daniel Elgallab',
+                  url: 'https://danielgallab.com',
+                },
+                creator: {
+                  '@type': 'Person',
+                  name: 'Daniel Elgallab',
+                  url: 'https://danielgallab.com',
+                },
+                genre: ['Puzzle', 'Word Game', 'Brain Teaser'],
+                gamePlayMode: ['SinglePlayer', 'MultiPlayer'],
+                inLanguage: 'en-US',
               },
-              description:
-                'Connect words in the shortest chain possible. Play the Daily Challenge or battle against friends in this addictive word puzzle game.',
-              url: 'https://wordbridge.danielgallab.com',
-              image: 'https://wordbridge.danielgallab.com/opengraph-image',
-              creator: {
-                '@type': 'Person',
-                name: 'Daniel Elgallab',
-              },
-              genre: ['Puzzle', 'Word Game', 'Brain Teaser'],
-              gamePlayMode: ['SinglePlayer', 'MultiPlayer'],
-              inLanguage: 'en-US',
-            }),
+            ]),
           }}
         />
       </head>
