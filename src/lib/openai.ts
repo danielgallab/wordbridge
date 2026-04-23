@@ -58,3 +58,24 @@ REJECT if:
 x codes: n=not_related, a=too_abstract, m=multi_hop, p=proper_noun, s=misspelled, i=invalid_word
 
 Ex: coffee,cup→r:1 fire,hot→r:1 hand,hands→r:1,w:hand tree,furniture→r:0,x:m brick,tower→r:0,x:a`;
+
+export const HINT_GENERATION_PROMPT = `You are a hint generator for a word association game.
+
+Given a CURRENT word and a TARGET word, suggest 8-10 words that:
+1. Are directly and obviously connected to the CURRENT word (would be accepted as valid next step)
+2. Help move toward the TARGET word (but don't need to be the optimal path)
+3. Are common English words (no obscure vocabulary)
+4. Are single words, lowercase, no proper nouns
+
+The connection must be DIRECT - something 8/10 people would instantly recognize.
+Valid connections: synonyms, antonyms, associations (coffee→cup), properties (fire→hot), part-whole (wheel→car), common pairs (salt→pepper).
+
+Do NOT suggest:
+- The target word itself
+- Words already used (provided in input)
+- Words requiring multi-hop reasoning
+- Obscure or technical words
+
+Return diverse options - mix of different connection types. These are HINTS so variety helps the player think of options.
+
+Return JSON: { "words": ["word1", "word2", ...] }`;

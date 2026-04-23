@@ -17,11 +17,24 @@ interface PracticeState {
   isValidating: boolean;
   error: string | null;
 
+  // Hint state
+  hintWords: string[];
+  showHints: boolean;
+  rejectionCount: number;
+  lastWordTimestamp: number;
+  isFetchingHints: boolean;
+
   // Actions
   initializeWithData: (puzzle: PracticePuzzle) => void;
   loadNewPuzzle: () => Promise<void>;
   submitWord: (word: string) => Promise<boolean>;
   reset: () => void;
+
+  // Hint actions
+  fetchHints: () => Promise<void>;
+  incrementRejectionCount: () => void;
+  resetHintState: () => void;
+  dismissHints: () => void;
 }
 
 export const usePracticeStore = create<PracticeState>((set, get) => ({
@@ -32,6 +45,13 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
   isValidating: false,
   error: null,
 
+  // Hint state
+  hintWords: [],
+  showHints: false,
+  rejectionCount: 0,
+  lastWordTimestamp: Date.now(),
+  isFetchingHints: false,
+
   initializeWithData: (puzzle: PracticePuzzle) => {
     set({
       puzzle,
@@ -40,6 +60,12 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
       isLoading: false,
       isValidating: false,
       error: null,
+      // Reset hint state
+      hintWords: [],
+      showHints: false,
+      rejectionCount: 0,
+      lastWordTimestamp: Date.now(),
+      isFetchingHints: false,
     });
   },
 
@@ -62,6 +88,12 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
         chain: [puzzle.start_word],
         isComplete: false,
         isLoading: false,
+        // Reset hint state
+        hintWords: [],
+        showHints: false,
+        rejectionCount: 0,
+        lastWordTimestamp: Date.now(),
+        isFetchingHints: false,
       });
     } catch {
       set({ error: 'Network error. Please try again.', isLoading: false });
@@ -118,16 +150,22 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
           error: errorMessage,
           isValidating: false,
           chain: previousChain,
+          rejectionCount: state.rejectionCount + 1,
         });
         setTimeout(() => set({ error: null }), 2500);
         return false;
       }
 
-      // Update with server-confirmed chain
+      // Update with server-confirmed chain and reset hint state
       set({
         chain: data.chain,
         isValidating: false,
         isComplete: data.isComplete,
+        // Reset hints on successful word
+        hintWords: [],
+        showHints: false,
+        rejectionCount: 0,
+        lastWordTimestamp: Date.now(),
       });
 
       return true;
@@ -151,5 +189,65 @@ export const usePracticeStore = create<PracticeState>((set, get) => ({
       isLoading: false,
       isValidating: false,
       error: null,
+      hintWords: [],
+      showHints: false,
+      rejectionCount: 0,
+      lastWordTimestamp: Date.now(),
+      isFetchingHints: false,
     }),
+
+  // Hint actions
+  fetchHints: async () => {
+    const state = get();
+    if (!state.puzzle || state.isFetchingHints || state.isComplete) return;
+
+    const currentWord = state.chain[state.chain.length - 1];
+    const targetWord = state.puzzle.target_word;
+
+    set({ isFetchingHints: true });
+
+    try {
+      const response = await fetch('/api/hint', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          currentWord,
+          targetWord,
+          usedWords: state.chain,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.words && data.words.length > 0) {
+        set({
+          hintWords: data.words,
+          showHints: true,
+          isFetchingHints: false,
+        });
+      } else {
+        set({ isFetchingHints: false });
+      }
+    } catch {
+      set({ isFetchingHints: false });
+    }
+  },
+
+  incrementRejectionCount: () => {
+    set((state) => ({ rejectionCount: state.rejectionCount + 1 }));
+  },
+
+  resetHintState: () => {
+    set({
+      hintWords: [],
+      showHints: false,
+      rejectionCount: 0,
+      lastWordTimestamp: Date.now(),
+      isFetchingHints: false,
+    });
+  },
+
+  dismissHints: () => {
+    set({ showHints: false });
+  },
 }));

@@ -65,6 +65,13 @@ interface DailyState {
   isValidating: boolean;
   error: string | null;
 
+  // Hint state
+  hintWords: string[];
+  showHints: boolean;
+  rejectionCount: number;
+  lastWordTimestamp: number;
+  isFetchingHints: boolean;
+
   // Stats
   stats: PlayerStats | null;
   leaderboard: LeaderboardEntry[];
@@ -81,6 +88,12 @@ interface DailyState {
   loadLeaderboard: () => Promise<void>;
   submitWord: (word: string) => Promise<boolean>;
   reset: () => void;
+
+  // Hint actions
+  fetchHints: () => Promise<void>;
+  incrementRejectionCount: () => void;
+  resetHintState: () => void;
+  dismissHints: () => void;
 }
 
 export const useDailyStore = create<DailyState>((set, get) => ({
@@ -92,6 +105,14 @@ export const useDailyStore = create<DailyState>((set, get) => ({
   isLoading: false,
   isValidating: false,
   error: null,
+
+  // Hint state
+  hintWords: [],
+  showHints: false,
+  rejectionCount: 0,
+  lastWordTimestamp: Date.now(),
+  isFetchingHints: false,
+
   stats: null,
   leaderboard: [],
   totalCompletions: 0,
@@ -280,17 +301,23 @@ export const useDailyStore = create<DailyState>((set, get) => ({
           error: errorMessage,
           isValidating: false,
           chain: previousChain,
+          rejectionCount: state.rejectionCount + 1,
         });
         setTimeout(() => set({ error: null }), 2500);
         return false;
       }
 
-      // Update with server-confirmed chain
+      // Update with server-confirmed chain and reset hint state
       set({
         chain: data.chain,
         isValidating: false,
         isComplete: data.isComplete,
         hasCompletedToday: data.isComplete && !data.isPractice ? true : state.hasCompletedToday,
+        // Reset hints on successful word
+        hintWords: [],
+        showHints: false,
+        rejectionCount: 0,
+        lastWordTimestamp: Date.now(),
       });
 
       // Save progress to localStorage (only for non-complete attempts)
@@ -328,8 +355,68 @@ export const useDailyStore = create<DailyState>((set, get) => ({
       isLoading: false,
       isValidating: false,
       error: null,
+      hintWords: [],
+      showHints: false,
+      rejectionCount: 0,
+      lastWordTimestamp: Date.now(),
+      isFetchingHints: false,
       stats: null,
       leaderboard: [],
       totalCompletions: 0,
     }),
+
+  // Hint actions
+  fetchHints: async () => {
+    const state = get();
+    if (!state.puzzle || state.isFetchingHints || state.isComplete || state.hasCompletedToday) return;
+
+    const currentWord = state.chain[state.chain.length - 1];
+    const targetWord = state.puzzle.target_word;
+
+    set({ isFetchingHints: true });
+
+    try {
+      const response = await fetch('/api/hint', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          currentWord,
+          targetWord,
+          usedWords: state.chain,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.words && data.words.length > 0) {
+        set({
+          hintWords: data.words,
+          showHints: true,
+          isFetchingHints: false,
+        });
+      } else {
+        set({ isFetchingHints: false });
+      }
+    } catch {
+      set({ isFetchingHints: false });
+    }
+  },
+
+  incrementRejectionCount: () => {
+    set((state) => ({ rejectionCount: state.rejectionCount + 1 }));
+  },
+
+  resetHintState: () => {
+    set({
+      hintWords: [],
+      showHints: false,
+      rejectionCount: 0,
+      lastWordTimestamp: Date.now(),
+      isFetchingHints: false,
+    });
+  },
+
+  dismissHints: () => {
+    set({ showHints: false });
+  },
 }));

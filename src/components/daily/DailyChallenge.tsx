@@ -7,6 +7,8 @@ import { useDailyStore } from '@/stores/dailyStore';
 import { ensureSessionId } from '@/lib/sessionId';
 import { WordInput, type WordInputHandle } from '@/components/game/WordInput';
 import { ChainDisplay } from '@/components/game/ChainDisplay';
+import { HintBubble } from '@/components/game/HintBubble';
+import { useHintTrigger } from '@/hooks/useHintTrigger';
 import { DailyCompletionModal } from './DailyCompletionModal';
 import { calculatePathQuality } from '@/lib/scoring';
 import { useSoundEffects } from '@/hooks/useSoundEffects';
@@ -37,10 +39,28 @@ export function DailyChallenge({ initialData }: DailyChallengeProps) {
     isLoading,
     isValidating,
     error,
-    sessionId,
     initializeWithData,
     submitWord,
+    // Hint state
+    hintWords,
+    showHints,
+    rejectionCount,
+    lastWordTimestamp,
+    isFetchingHints,
+    fetchHints,
+    dismissHints,
   } = useDailyStore();
+
+  // Hint trigger hook
+  useHintTrigger({
+    chainLength: chain.length,
+    rejectionCount,
+    lastWordTimestamp,
+    onTrigger: fetchHints,
+    enabled: !isComplete && !hasCompletedToday && !isLoading && !!puzzle,
+    showHints,
+    isFetchingHints,
+  });
 
   // Initialize store with SSR data on mount
   useEffect(() => {
@@ -159,6 +179,11 @@ export function DailyChallenge({ initialData }: DailyChallengeProps) {
             isValidating={isValidating}
           />
         </div>
+
+        {/* Hint Bubble */}
+        {showHints && hintWords.length > 0 && (
+          <HintBubble words={hintWords} onDismiss={dismissHints} />
+        )}
 
         {/* Word Input */}
         <WordInput

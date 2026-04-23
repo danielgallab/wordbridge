@@ -6,6 +6,8 @@ import { Home, RotateCcw, Plus, LogIn } from 'lucide-react';
 import { usePracticeStore, type PracticePuzzle } from '@/stores/practiceStore';
 import { WordInput, type WordInputHandle } from '@/components/game/WordInput';
 import { ChainDisplay } from '@/components/game/ChainDisplay';
+import { HintBubble } from '@/components/game/HintBubble';
+import { useHintTrigger } from '@/hooks/useHintTrigger';
 import { PracticeCompletionModal } from './PracticeCompletionModal';
 import { calculatePathQuality } from '@/lib/scoring';
 import { useSoundEffects } from '@/hooks/useSoundEffects';
@@ -39,7 +41,26 @@ export function PracticeMode({ initialData }: PracticeModeProps) {
     loadNewPuzzle,
     submitWord,
     reset,
+    // Hint state
+    hintWords,
+    showHints,
+    rejectionCount,
+    lastWordTimestamp,
+    isFetchingHints,
+    fetchHints,
+    dismissHints,
   } = usePracticeStore();
+
+  // Hint trigger hook
+  useHintTrigger({
+    chainLength: chain.length,
+    rejectionCount,
+    lastWordTimestamp,
+    onTrigger: fetchHints,
+    enabled: !isComplete && !isLoading && !!puzzle,
+    showHints,
+    isFetchingHints,
+  });
 
   // Initialize with SSR data on mount, or fetch if no initial data
   useEffect(() => {
@@ -154,6 +175,11 @@ export function PracticeMode({ initialData }: PracticeModeProps) {
             isValidating={isValidating}
           />
         </div>
+
+        {/* Hint Bubble */}
+        {showHints && hintWords.length > 0 && (
+          <HintBubble words={hintWords} onDismiss={dismissHints} />
+        )}
 
         {/* Word Input */}
         <WordInput
