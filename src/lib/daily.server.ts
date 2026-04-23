@@ -124,7 +124,7 @@ export async function getDailyData(sessionId: string): Promise<DailyData | null>
     }
 
     // Fetch puzzle and session-independent data in parallel
-    const [puzzle, statsResult, avgResult] = await Promise.all([
+    const [puzzle, statsResult, avgResult, todayCompletionResult] = await Promise.all([
       fetchOrCreatePuzzle(supabase, today),
       supabase
         .from('player_stats')
@@ -135,17 +135,18 @@ export async function getDailyData(sessionId: string): Promise<DailyData | null>
         .from('daily_completions')
         .select('word_count')
         .eq('session_id', sessionId),
+      // Fetch today's completion by date instead of puzzle.id to avoid waterfall
+      supabase
+        .from('daily_completions')
+        .select('*, daily_puzzles!inner(puzzle_date)')
+        .eq('session_id', sessionId)
+        .eq('daily_puzzles.puzzle_date', today)
+        .single(),
     ]);
 
     if (!puzzle) return null;
 
-    // Now fetch completion (needs puzzle.id)
-    const { data: dbCompletion } = await supabase
-      .from('daily_completions')
-      .select('*')
-      .eq('puzzle_id', puzzle.id)
-      .eq('session_id', sessionId)
-      .single();
+    const dbCompletion = todayCompletionResult.data;
 
     const dbStats = statsResult.data;
 

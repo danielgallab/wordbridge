@@ -9,15 +9,16 @@ interface HomeProps {
 }
 
 export default async function Home({ searchParams }: HomeProps) {
-  const params = await searchParams;
-  const sessionId = await getSessionId();
-  const dailyData = await getDailyData(sessionId);
+  const [params, sessionId] = await Promise.all([
+    searchParams,
+    getSessionId(),
+  ]);
 
-  // Fetch shared completion if share ID is in the URL
-  let shareData: ShareCompletion | null = null;
-  if (params.share) {
-    shareData = await getShareCompletion(params.share);
-  }
+  // Fetch daily data and share completion in parallel
+  const [dailyData, shareData] = await Promise.all([
+    getDailyData(sessionId),
+    params.share ? getShareCompletion(params.share) : null,
+  ]);
 
   return (
     <main className="flex-1 flex flex-col items-center justify-center p-4">
