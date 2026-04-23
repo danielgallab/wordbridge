@@ -46,6 +46,7 @@ interface GameState {
 
   // Game state
   myChain: string[];
+  myAttempts: { valid: boolean }[];
   timeLeft: number;
   gameStartedAt: string | null; // Server timestamp for synchronized timer
   rematchStatus: RematchStatus;
@@ -79,6 +80,7 @@ export const useGameStore = create<GameState>((set, get) => ({
   players: [],
   isHost: false,
   myChain: [],
+  myAttempts: [],
   timeLeft: TOTAL_TIME,
   gameStartedAt: null,
   rematchStatus: 'none',
@@ -175,6 +177,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       players,
       isHost,
       myChain: me?.chain || [room.start_word],
+      myAttempts: [],
       timeLeft,
       gameStartedAt: room.started_at || null,
       rematchStatus: 'none',
@@ -225,8 +228,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       const data = await response.json();
 
       if (!response.ok) {
-        // Rollback optimistic update on error
-        // Use rejection reason to show user-friendly message
+        // Rollback optimistic update on error and record failed attempt
         const reason = data.reason as RejectionReason | undefined;
         const errorMessage = reason && REJECTION_MESSAGES[reason]
           ? REJECTION_MESSAGES[reason]
@@ -234,15 +236,17 @@ export const useGameStore = create<GameState>((set, get) => ({
         set({
           error: errorMessage,
           isValidating: false,
-          myChain: previousChain  // Restore previous chain
+          myChain: previousChain,
+          myAttempts: [...state.myAttempts, { valid: false }],
         });
         setTimeout(() => set({ error: null }), 2500);
         return false;
       }
 
-      // Update with server-confirmed chain (should match optimistic)
+      // Update with server-confirmed chain and record successful attempt
       set({
         myChain: data.chain,
+        myAttempts: [...state.myAttempts, { valid: true }],
         isValidating: false,
       });
 
@@ -416,6 +420,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       rematchStatus: 'starting',
       localGameEnded: false,
       myChain: [startWord],
+      myAttempts: [],
       timeLeft: state.room?.time_limit || TOTAL_TIME,
       winner: null,
       error: null,
@@ -492,6 +497,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       players: [],
       isHost: false,
       myChain: [],
+      myAttempts: [],
       timeLeft: TOTAL_TIME,
       gameStartedAt: null,
       rematchStatus: 'none',

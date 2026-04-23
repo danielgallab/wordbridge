@@ -2,10 +2,23 @@ import { DailyChallenge } from '@/components/daily';
 import { getSessionId } from '@/lib/sessionId.server';
 import { getDailyData } from '@/lib/daily.server';
 import { HomeClient } from '@/components/HomeClient';
+import { decodeChallenge } from '@/lib/challenge';
+import type { ChallengeData } from '@/lib/challenge';
 
-export default async function Home() {
+interface HomeProps {
+  searchParams: Promise<{ challenge?: string }>;
+}
+
+export default async function Home({ searchParams }: HomeProps) {
+  const params = await searchParams;
   const sessionId = await getSessionId();
   const dailyData = await getDailyData(sessionId);
+
+  // Decode challenge data from share link if present
+  let challengeData: ChallengeData | null = null;
+  if (params.challenge) {
+    challengeData = decodeChallenge(params.challenge);
+  }
 
   return (
     <main className="flex-1 flex flex-col items-center justify-center p-4">
@@ -22,7 +35,7 @@ export default async function Home() {
         </p>
 
         {/* Daily Challenge */}
-        <DailyChallenge initialData={dailyData} />
+        <DailyChallenge initialData={dailyData} challengeData={challengeData} />
 
         {/* Footer links */}
         <HomeClient />

@@ -39,6 +39,7 @@ export function GameArena() {
     room,
     playerId,
     myChain,
+    myAttempts,
     timeLeft,
     rematchStatus,
     winner,
@@ -51,6 +52,7 @@ export function GameArena() {
       room: state.room,
       playerId: state.playerId,
       myChain: state.myChain,
+      myAttempts: state.myAttempts,
       timeLeft: state.timeLeft,
       rematchStatus: state.rematchStatus,
       winner: state.winner,
@@ -139,8 +141,14 @@ export function GameArena() {
     : null;
 
   const handleShare = useCallback(async () => {
+    // Build attempt pattern: ✅ for valid, ❌ for invalid
+    const attemptIcons = myAttempts.map(a => a.valid ? '✅' : '❌').join(' ');
+    const attemptLine = `${room?.start_word.toUpperCase()} → ${attemptIcons} → ${room?.target_word.toUpperCase()}`;
+    const missteps = myAttempts.filter(a => !a.valid).length;
+
     const shareText = `WordBridge: ${room?.start_word.toUpperCase()} → ${room?.target_word.toUpperCase()}\n` +
-      `My chain (${myChain.length - 1} steps): ${myChain.join(' → ')}\n` +
+      `${attemptLine}\n` +
+      `Bridged it in ${myChain.length - 1} steps with ${missteps} misstep${missteps === 1 ? '' : 's'}!\n` +
       `Play at: wordbridge.app`;
 
     try {
@@ -157,7 +165,7 @@ export function GameArena() {
         // Clipboard not available
       }
     }
-  }, [room?.start_word, room?.target_word, myChain]);
+  }, [room?.start_word, room?.target_word, myChain, myAttempts]);
 
   const handleSubmitWord = useCallback(
     async (word: string) => {

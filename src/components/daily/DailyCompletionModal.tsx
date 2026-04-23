@@ -6,6 +6,7 @@ import { useDailyStore } from '@/stores/dailyStore';
 import { DailyLeaderboard } from './DailyLeaderboard';
 import { DailyStats } from './DailyStats';
 import { NameInputModal } from './NameInputModal';
+import { encodeChallenge, type ChallengeData } from '@/lib/challenge';
 import type { DailyPuzzle } from '@/types';
 import type { PathQuality } from '@/lib/scoring';
 import Link from 'next/link';
@@ -13,14 +14,18 @@ import Link from 'next/link';
 interface DailyCompletionModalProps {
   puzzle: DailyPuzzle;
   chain: string[];
+  attempts: { valid: boolean }[];
   pathQuality: { rating: PathQuality; emoji: string; description: string } | null;
+  challengeData?: ChallengeData | null;
   alreadyCompleted?: boolean;
 }
 
 export function DailyCompletionModal({
   puzzle,
   chain,
+  attempts,
   pathQuality,
+  challengeData,
   alreadyCompleted,
 }: DailyCompletionModalProps) {
   const { loadLeaderboard, stats, sessionId, previousCompletion } = useDailyStore();
@@ -73,13 +78,20 @@ export function DailyCompletionModal({
   });
 
   const handleShare = async () => {
-    const chains = '⛓️'.repeat(wordCount);
+    // Build attempt pattern: ✅ for valid, ❌ for invalid
+    const attemptIcons = attempts.map(a => a.valid ? '✅' : '❌').join(' ');
+    const attemptLine = `${puzzle.start_word.toUpperCase()} → ${attemptIcons} → ${puzzle.target_word.toUpperCase()}`;
+    const missteps = attempts.filter(a => !a.valid).length;
+
+    // Encode challenge data into URL so recipient sees our path after completing
+    const challengeCode = encodeChallenge({ chain, attempts });
+    const challengeUrl = `https://wordbridge.danielgallab.com/?challenge=${challengeCode}`;
 
     const shareText =
       `WordBridge Daily #${puzzleNumber}\n\n` +
-      `${puzzle.start_word.toUpperCase()} ${chains} ${puzzle.target_word.toUpperCase()} ${pathQuality?.emoji || ''}\n\n` +
-      `I solved it in ${wordCount} words. Can you beat that?\n\n` +
-      `https://wordbridge.danielgallab.com`;
+      `${attemptLine} ${pathQuality?.emoji || ''}\n\n` +
+      `I bridged it in ${wordCount} words with ${missteps} misstep${missteps === 1 ? '' : 's'}. Can you beat that?\n\n` +
+      challengeUrl;
 
     try {
       if (navigator.share) {
@@ -141,6 +153,21 @@ export function DailyCompletionModal({
             {chain.join(' → ')}
           </div>
         </div>
+
+        {/* Challenger's Path - shown when opened from a share link */}
+        {challengeData && (
+          <div className="bg-[var(--background)] rounded-lg p-3 mb-4 border border-[var(--border)]">
+            <div className="text-xs uppercase tracking-wider text-[var(--text-muted)] font-bold mb-2">
+              Their Solution
+            </div>
+            <div className="font-mono text-sm text-[var(--text-muted)] break-words">
+              {challengeData.chain.join(' → ')}
+            </div>
+            <div className="text-xs text-[var(--text-muted)] mt-2">
+              {challengeData.chain.length} words &middot; {challengeData.attempts.filter(a => !a.valid).length} misstep{challengeData.attempts.filter(a => !a.valid).length === 1 ? '' : 's'}
+            </div>
+          </div>
+        )}
 
         {/* Name Input - only show when just completed (not already completed) */}
         {showNameInput && (
