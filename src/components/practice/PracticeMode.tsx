@@ -8,6 +8,7 @@ import { WordInput, type WordInputHandle } from '@/components/game/WordInput';
 import { ChainDisplay } from '@/components/game/ChainDisplay';
 import { HintBubble } from '@/components/game/HintBubble';
 import { useHintTrigger } from '@/hooks/useHintTrigger';
+import { usePlayerExperience } from '@/hooks/usePlayerExperience';
 import { PracticeCompletionModal } from './PracticeCompletionModal';
 import { calculatePathQuality } from '@/lib/scoring';
 import { useSoundEffects } from '@/hooks/useSoundEffects';
@@ -24,6 +25,7 @@ export function PracticeMode({ initialData }: PracticeModeProps) {
   const prevErrorRef = useRef<string | null>(null);
   const wordInputRef = useRef<WordInputHandle>(null);
   const { play: playSound } = useSoundEffects();
+  const { isExperienced, autoHintsEnabled, incrementGamesCompleted } = usePlayerExperience();
 
   // Keyboard shortcuts
   useKeyboardShortcuts({
@@ -51,15 +53,16 @@ export function PracticeMode({ initialData }: PracticeModeProps) {
     dismissHints,
   } = usePracticeStore();
 
-  // Hint trigger hook
+  // Hint trigger hook - respects player experience and preferences
   useHintTrigger({
     chainLength: chain.length,
     rejectionCount,
     lastWordTimestamp,
     onTrigger: fetchHints,
-    enabled: !isComplete && !isLoading && !!puzzle,
+    enabled: autoHintsEnabled && !isComplete && !isLoading && !!puzzle,
     showHints,
     isFetchingHints,
+    isExperienced,
   });
 
   // Initialize with SSR data on mount, or fetch if no initial data
@@ -80,12 +83,14 @@ export function PracticeMode({ initialData }: PracticeModeProps) {
     if (chain.length > prevChainLengthRef.current && prevChainLengthRef.current > 0) {
       if (isComplete) {
         playSound('win');
+        // Track game completion for hint frequency scaling
+        incrementGamesCompleted();
       } else {
         playSound('success');
       }
     }
     prevChainLengthRef.current = chain.length;
-  }, [chain.length, isComplete, playSound]);
+  }, [chain.length, isComplete, playSound, incrementGamesCompleted]);
 
   useEffect(() => {
     // Play error sound when error appears

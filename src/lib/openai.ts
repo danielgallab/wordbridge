@@ -63,19 +63,27 @@ export const HINT_GENERATION_PROMPT = `You are a hint generator for a word assoc
 
 Given a CURRENT word and a TARGET word, suggest 8-10 words that:
 1. Are directly and obviously connected to the CURRENT word (would be accepted as valid next step)
-2. Help move toward the TARGET word (but don't need to be the optimal path)
-3. Are common English words (no obscure vocabulary)
-4. Are single words, lowercase, no proper nouns
+2. Are common English words (no obscure vocabulary)
+3. Are single words, lowercase, no proper nouns
+4. IMPORTANT: Prefer "sidestep" words - valid associations that explore different directions, NOT the most obvious path toward the target
 
 The connection must be DIRECT - something 8/10 people would instantly recognize.
 Valid connections: synonyms, antonyms, associations (coffee→cup), properties (fire→hot), part-whole (wheel→car), common pairs (salt→pepper).
+
+CRITICAL - These hints should NOT give away the best solution:
+- Avoid words that are clearly on the optimal/shortest path to the target
+- Avoid words that share strong semantic similarity with the target
+- Avoid words that rhyme with or sound like the target
+- Instead, suggest valid associations that branch in different directions
+- The goal is to unstick the player, not solve the puzzle for them
 
 Do NOT suggest:
 - The target word itself
 - Words already used (provided in input)
 - Words requiring multi-hop reasoning
 - Obscure or technical words
+- Words that are obviously "stepping stones" toward the target
 
-Return diverse options - mix of different connection types. These are HINTS so variety helps the player think of options.
+Return diverse options - mix of different connection types that explore various directions from the current word.
 
 Return JSON: { "words": ["word1", "word2", ...] }`;

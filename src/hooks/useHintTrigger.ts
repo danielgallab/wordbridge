@@ -8,25 +8,40 @@ interface UseHintTriggerOptions {
   enabled: boolean;
   showHints: boolean;
   isFetchingHints: boolean;
+  // Experience-based settings
+  isExperienced?: boolean; // Has completed 3+ games
 }
 
-// Base thresholds — scale up as the chain grows
-const FIRST_WORD_DELAY = 10000; // 10 seconds for first word
-const BASE_LATER_DELAY = 15000; // 15 seconds base for later words
-const DELAY_PER_WORD = 5000;    // +5 seconds per word already in chain
-const BASE_REJECTION_THRESHOLD = 2;
-const REJECTION_PER_WORD = 1;   // +1 rejection needed per word in chain
+// Thresholds for NEW players (first 3 games) - helpful and frequent
+const NEW_PLAYER = {
+  FIRST_WORD_DELAY: 15000,    // 15 seconds for first word
+  BASE_LATER_DELAY: 20000,    // 20 seconds base for later words
+  DELAY_PER_WORD: 5000,       // +5 seconds per word already in chain
+  BASE_REJECTION_THRESHOLD: 2,
+  REJECTION_PER_WORD: 1,
+};
 
-function getTimeDelay(chainLength: number): number {
-  if (chainLength <= 1) return FIRST_WORD_DELAY;
+// Thresholds for EXPERIENCED players - much less intrusive
+const EXPERIENCED_PLAYER = {
+  FIRST_WORD_DELAY: 60000,    // 60 seconds for first word
+  BASE_LATER_DELAY: 45000,    // 45 seconds base for later words
+  DELAY_PER_WORD: 10000,      // +10 seconds per word already in chain
+  BASE_REJECTION_THRESHOLD: 5,
+  REJECTION_PER_WORD: 2,
+};
+
+function getTimeDelay(chainLength: number, isExperienced: boolean): number {
+  const config = isExperienced ? EXPERIENCED_PLAYER : NEW_PLAYER;
+  if (chainLength <= 1) return config.FIRST_WORD_DELAY;
   // words entered = chainLength - 1 (subtract the start word)
   const wordsEntered = chainLength - 1;
-  return BASE_LATER_DELAY + wordsEntered * DELAY_PER_WORD;
+  return config.BASE_LATER_DELAY + wordsEntered * config.DELAY_PER_WORD;
 }
 
-function getRejectionThreshold(chainLength: number): number {
+function getRejectionThreshold(chainLength: number, isExperienced: boolean): number {
+  const config = isExperienced ? EXPERIENCED_PLAYER : NEW_PLAYER;
   const wordsEntered = Math.max(0, chainLength - 1);
-  return BASE_REJECTION_THRESHOLD + wordsEntered * REJECTION_PER_WORD;
+  return config.BASE_REJECTION_THRESHOLD + wordsEntered * config.REJECTION_PER_WORD;
 }
 
 export function useHintTrigger({
@@ -37,6 +52,7 @@ export function useHintTrigger({
   enabled,
   showHints,
   isFetchingHints,
+  isExperienced = false,
 }: UseHintTriggerOptions) {
   const hasTriggeredRef = useRef(false);
   const mountTimeRef = useRef(Date.now());
@@ -61,15 +77,15 @@ export function useHintTrigger({
 
       const now = Date.now();
 
-      // Check rejection threshold — scales with progress
-      if (rejectionCount >= getRejectionThreshold(chainLength)) {
+      // Check rejection threshold — scales with progress and experience
+      if (rejectionCount >= getRejectionThreshold(chainLength, isExperienced)) {
         hasTriggeredRef.current = true;
         onTrigger();
         return;
       }
 
-      // Time-based trigger — delay scales with chain length
-      const delay = getTimeDelay(chainLength);
+      // Time-based trigger — delay scales with chain length and experience
+      const delay = getTimeDelay(chainLength, isExperienced);
       const elapsed =
         chainLength === 1
           ? now - mountTimeRef.current
@@ -97,6 +113,7 @@ export function useHintTrigger({
     rejectionCount,
     lastWordTimestamp,
     onTrigger,
+    isExperienced,
   ]);
 
   // Reset mount time when enabled changes (e.g., new puzzle)
