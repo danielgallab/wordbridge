@@ -22,6 +22,7 @@ function MultiplayerContent() {
   const [playerName, setPlayerName] = useState('');
   const [joinCode, setJoinCode] = useState('');
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
+  const [gameMode, setGameMode] = useState<'speed' | 'shortest'>('speed');
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState('');
@@ -39,7 +40,7 @@ function MultiplayerContent() {
       const res = await fetch('/api/rooms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ playerName: playerName.trim(), difficulty }),
+        body: JSON.stringify({ playerName: playerName.trim(), difficulty, gameMode }),
       });
 
       const data = await res.json();
@@ -158,6 +159,43 @@ function MultiplayerContent() {
 
           {mode === 'create' ? (
             <>
+              {/* Game Mode selector */}
+              <label className="block text-xs uppercase tracking-wider text-[var(--text-muted)] font-bold mb-2">
+                Game Mode
+              </label>
+              <div className="flex gap-2 mb-4">
+                <button
+                  onClick={() => setGameMode('speed')}
+                  className={`flex-1 py-2 px-3 rounded-md font-bold text-sm transition-all ${
+                    gameMode === 'speed'
+                      ? 'bg-[var(--present)] text-white'
+                      : 'bg-[var(--background)] border-2 border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--text-muted)]'
+                  }`}
+                >
+                  <div className="text-center">
+                    <div>Speed</div>
+                    <div className={`text-[10px] font-normal ${gameMode === 'speed' ? 'text-white/80' : 'text-[var(--text-muted)]'}`}>
+                      First to finish
+                    </div>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setGameMode('shortest')}
+                  className={`flex-1 py-2 px-3 rounded-md font-bold text-sm transition-all ${
+                    gameMode === 'shortest'
+                      ? 'bg-[var(--correct)] text-white'
+                      : 'bg-[var(--background)] border-2 border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--text-muted)]'
+                  }`}
+                >
+                  <div className="text-center">
+                    <div>Shortest</div>
+                    <div className={`text-[10px] font-normal ${gameMode === 'shortest' ? 'text-white/80' : 'text-[var(--text-muted)]'}`}>
+                      Fewest words wins
+                    </div>
+                  </div>
+                </button>
+              </div>
+
               {/* Difficulty selector */}
               <label className="block text-xs uppercase tracking-wider text-[var(--text-muted)] font-bold mb-2">
                 Difficulty

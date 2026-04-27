@@ -19,8 +19,8 @@ export interface WordAssociation {
   validated_at: string;
 }
 
-import type { RoomStatus, Difficulty } from '@/lib/constants';
-export type { Difficulty };
+import type { RoomStatus, Difficulty, GameMode } from '@/lib/constants';
+export type { Difficulty, GameMode };
 
 export interface Room {
   id: string;
@@ -30,6 +30,7 @@ export interface Room {
   target_word: string;
   time_limit: number;
   difficulty: Difficulty;
+  game_mode: GameMode;
   created_at: string;
   started_at: string | null;
   finished_at: string | null;

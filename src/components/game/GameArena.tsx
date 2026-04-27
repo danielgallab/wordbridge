@@ -76,6 +76,12 @@ export function GameArena() {
   const winnerPlayer = players.find(p => p.id === winner);
   const didIWin = winner === playerId;
   const isDraw = winner === null && isFinished;
+  const isShortestMode = room?.game_mode === 'shortest';
+
+  // In shortest mode, check if current player has reached the target (finished but game still playing)
+  const myLastWord = myChain[myChain.length - 1]?.toLowerCase();
+  const targetWord = room?.target_word?.toLowerCase();
+  const iHaveFinished = myLastWord === targetWord;
 
   // Derive rematch state from rematchStatus
   const wantsRematch = rematchStatus === 'requested';
@@ -87,6 +93,10 @@ export function GameArena() {
   const [showRematchUI, setShowRematchUI] = useState(false);
   const [gameOverKey, setGameOverKey] = useState(0);
   const [prevChainLength, setPrevChainLength] = useState(myChain.length);
+
+  // Copy invite link state
+  const [linkCopied, setLinkCopied] = useState(false);
+  const linkCopiedTimeout = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // Sound effects
   const { play: playSound } = useSoundEffects();
@@ -192,18 +202,6 @@ export function GameArena() {
     router.push('/');
   };
 
-  if (!room) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <p className="text-[var(--text-muted)]">Loading game...</p>
-      </div>
-    );
-  }
-
-  // Copy invite link handler
-  const [linkCopied, setLinkCopied] = useState(false);
-  const linkCopiedTimeout = useRef<ReturnType<typeof setTimeout>>(undefined);
-
   const handleCopyInviteLink = useCallback(async () => {
     const url = `${window.location.origin}/play/${room?.code}`;
     try {
@@ -227,6 +225,14 @@ export function GameArena() {
     }
   }, [room?.code]);
 
+  if (!room) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <p className="text-[var(--text-muted)]">Loading game...</p>
+      </div>
+    );
+  }
+
   // Waiting for players / lobby
   if (isWaiting) {
     const canStart = players.length >= 2;
@@ -247,6 +253,33 @@ export function GameArena() {
             <p className="text-sm sm:text-base text-[var(--text-muted)] mb-2">Share this code:</p>
             <div className="text-3xl sm:text-4xl font-mono font-bold tracking-widest text-[var(--present)]">
               {room.code}
+            </div>
+            {/* Game mode badge */}
+            <div className="flex justify-center gap-2 mt-2">
+              {room.game_mode && (
+                <span
+                  className={`text-xs px-2 py-0.5 rounded font-bold uppercase ${
+                    room.game_mode === 'speed'
+                      ? 'bg-[var(--present)]/20 text-[var(--present)]'
+                      : 'bg-[var(--correct)]/20 text-[var(--correct)]'
+                  }`}
+                >
+                  {room.game_mode === 'speed' ? 'Speed Mode' : 'Shortest Mode'}
+                </span>
+              )}
+              {room.difficulty && (
+                <span
+                  className={`text-xs px-2 py-0.5 rounded font-bold uppercase ${
+                    room.difficulty === 'easy'
+                      ? 'bg-[var(--correct)]/20 text-[var(--correct)]'
+                      : room.difficulty === 'medium'
+                      ? 'bg-[var(--present)]/20 text-[var(--present)]'
+                      : 'bg-[var(--error)]/20 text-[var(--error)]'
+                  }`}
+                >
+                  {room.difficulty}
+                </span>
+              )}
             </div>
           </div>
 
@@ -352,8 +385,8 @@ export function GameArena() {
               {room.target_word}
             </span>
           </div>
-          {room.difficulty && (
-            <div className="flex justify-center mt-1">
+          <div className="flex justify-center gap-2 mt-1 flex-wrap">
+            {room.difficulty && (
               <span
                 className={`text-xs px-2 py-0.5 rounded font-bold uppercase ${
                   room.difficulty === 'easy'
@@ -365,8 +398,19 @@ export function GameArena() {
               >
                 {room.difficulty}
               </span>
-            </div>
-          )}
+            )}
+            {room.game_mode && (
+              <span
+                className={`text-xs px-2 py-0.5 rounded font-bold uppercase ${
+                  room.game_mode === 'speed'
+                    ? 'bg-[var(--present)]/20 text-[var(--present)]'
+                    : 'bg-[var(--correct)]/20 text-[var(--correct)]'
+                }`}
+              >
+                {room.game_mode === 'speed' ? 'Speed' : 'Shortest'}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -377,6 +421,16 @@ export function GameArena() {
 
       {/* Arena */}
       <div className="space-y-4">
+        {/* Shortest mode: Show "Finished!" banner when player completes but game continues */}
+        {isShortestMode && iHaveFinished && isPlaying && (
+          <div className="bg-[var(--correct)]/20 border-2 border-[var(--correct)] rounded-lg p-3 text-center">
+            <div className="text-[var(--correct)] font-bold text-lg">Finished!</div>
+            <div className="text-sm text-[var(--text-muted)]">
+              Waiting for other players or time to run out...
+            </div>
+          </div>
+        )}
+
         {/* Your Panel - Full Size */}
         <PlayerPanel
           name={myName}
@@ -384,7 +438,7 @@ export function GameArena() {
           targetWord={room.target_word}
           isYou
           isWinner={didIWin}
-          showInput={isPlaying}
+          showInput={isPlaying && !(isShortestMode && iHaveFinished)}
           onSubmitWord={handleSubmitWord}
           isValidating={isValidating}
           error={error}
@@ -404,6 +458,8 @@ export function GameArena() {
                   chain={player.chain}
                   isWinner={winner === player.id}
                   showFullChain={isFinished}
+                  targetWord={isShortestMode ? room.target_word : undefined}
+                  hideStepCount={isShortestMode && !isFinished}
                 />
               ))}
             </div>
@@ -422,7 +478,7 @@ export function GameArena() {
             myChain={myChain}
             otherPlayers={otherPlayers}
             winner={winner}
-            room={{ start_word: room.start_word, target_word: room.target_word }}
+            room={{ start_word: room.start_word, target_word: room.target_word, game_mode: room.game_mode }}
             showRematchUI={showRematchUI}
             wantsRematch={wantsRematch}
             isRematchStarting={isRematchStarting}

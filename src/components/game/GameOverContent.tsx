@@ -26,6 +26,7 @@ interface GameOverContentProps {
   room: {
     start_word: string;
     target_word: string;
+    game_mode?: 'speed' | 'shortest';
   };
   showRematchUI: boolean;
   wantsRematch: boolean;
@@ -54,6 +55,10 @@ export function GameOverContent({
   onGoHome,
 }: GameOverContentProps) {
   const [shareStatus, setShareStatus] = useState<'idle' | 'copied'>('idle');
+  const isShortestMode = room.game_mode === 'shortest';
+
+  // Get winner's chain length for display
+  const winnerChainLength = winnerPlayer?.chain ? winnerPlayer.chain.length - 1 : 0;
 
   const handleShare = async () => {
     try {
@@ -88,6 +93,13 @@ export function GameOverContent({
         >
           {didIWin ? 'You Win!' : isDraw ? 'Draw!' : `${winnerPlayer?.player_name || 'Someone'} Wins!`}
         </h2>
+
+        {/* Shortest mode: Show winning chain length */}
+        {isShortestMode && winnerPlayer && !isDraw && (
+          <p className="text-sm text-[var(--text-muted)] mb-2">
+            Shortest path: {winnerChainLength} {winnerChainLength === 1 ? 'step' : 'steps'}
+          </p>
+        )}
 
         {/* Path quality rating */}
         {pathQuality && didIWin && (

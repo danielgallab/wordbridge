@@ -61,10 +61,26 @@ export const POST = withErrorHandler('rooms/rematch', async (request: Request) =
   if (allWantRematch) {
     debug.api.log('[rematch] Both players want rematch - starting new game');
 
-    // Generate a fresh random word pair
+    // Get the current room to preserve difficulty and game_mode
+    const { data: room, error: roomFetchError } = await supabase
+      .from('rooms')
+      .select('difficulty, game_mode')
+      .eq('id', roomId)
+      .single();
+
+    if (roomFetchError || !room) {
+      throw new ApiError({
+        code: 'DATABASE_ERROR',
+        message: 'Failed to fetch room settings',
+        detail: 'rooms select failed',
+        cause: roomFetchError,
+      });
+    }
+
+    // Generate a fresh random word pair with the same difficulty
     let randomPair;
     try {
-      randomPair = await generateWordPair(supabase, 'medium');
+      randomPair = await generateWordPair(supabase, room.difficulty || 'medium');
     } catch (err) {
       throw new ApiError({
         code: 'UPSTREAM_ERROR',

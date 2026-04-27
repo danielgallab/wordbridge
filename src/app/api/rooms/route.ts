@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { generateWordPair } from '@/lib/wordPairs';
-import { ROOM_STATUS, DIFFICULTIES, type Difficulty } from '@/lib/constants';
+import { ROOM_STATUS, DIFFICULTIES, GAME_MODES, DEFAULT_TIME_LIMIT, DEFAULT_SHORTEST_TIME_LIMIT, type Difficulty, type GameMode } from '@/lib/constants';
 import { ApiError, withErrorHandler } from '@/lib/api-error';
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 
@@ -20,7 +20,11 @@ function generateRoomCode(): string {
 export const POST = withErrorHandler('rooms/create', async (request: Request) => {
   checkRateLimit(request as NextRequest, 'rooms/create', RATE_LIMITS.room);
 
-  const { playerName, difficulty = 'medium' } = await request.json() as { playerName?: string; difficulty?: Difficulty };
+  const { playerName, difficulty = 'medium', gameMode = 'speed' } = await request.json() as {
+    playerName?: string;
+    difficulty?: Difficulty;
+    gameMode?: GameMode;
+  };
 
   if (!playerName?.trim()) {
     throw new ApiError({ code: 'BAD_REQUEST', message: 'Player name is required' });
@@ -29,6 +33,13 @@ export const POST = withErrorHandler('rooms/create', async (request: Request) =>
   if (!(DIFFICULTIES as readonly string[]).includes(difficulty)) {
     throw new ApiError({ code: 'BAD_REQUEST', message: 'Invalid difficulty' });
   }
+
+  if (!(GAME_MODES as readonly string[]).includes(gameMode)) {
+    throw new ApiError({ code: 'BAD_REQUEST', message: 'Invalid game mode' });
+  }
+
+  // Use different time limits based on game mode
+  const timeLimit = gameMode === 'shortest' ? DEFAULT_SHORTEST_TIME_LIMIT : DEFAULT_TIME_LIMIT;
 
   const supabase = createServiceClient();
 
@@ -69,6 +80,8 @@ export const POST = withErrorHandler('rooms/create', async (request: Request) =>
       start_word: wordPair.start_word,
       target_word: wordPair.target_word,
       difficulty,
+      game_mode: gameMode,
+      time_limit: timeLimit,
     })
     .select()
     .single();

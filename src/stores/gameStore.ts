@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { DEFAULT_TIME_LIMIT, ROOM_STATUS, type RoomStatus } from '@/lib/constants';
+import { DEFAULT_TIME_LIMIT, ROOM_STATUS, type RoomStatus, type GameMode } from '@/lib/constants';
 import { debug } from '@/lib/debug';
 import { normalizeWord, checkDuplicate, parseSubmissionError, flashError } from '@/lib/submission';
 
@@ -25,6 +25,7 @@ interface Room {
   target_word: string;
   time_limit: number;
   difficulty?: 'easy' | 'medium' | 'hard';
+  game_mode?: GameMode;
   winner_id: string | null;
   started_at?: string | null;
 }

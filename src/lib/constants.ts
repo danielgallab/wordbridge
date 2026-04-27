@@ -38,6 +38,12 @@ export type RoomStatus = (typeof ROOM_STATUS)[keyof typeof ROOM_STATUS];
 export const DIFFICULTIES = ['easy', 'medium', 'hard'] as const;
 export type Difficulty = (typeof DIFFICULTIES)[number];
 
+// --- Game mode ---
+
+export const GAME_MODES = ['speed', 'shortest'] as const;
+export type GameMode = (typeof GAME_MODES)[number];
+
 // --- Game timing ---
 
 export const DEFAULT_TIME_LIMIT = 90;
+export const DEFAULT_SHORTEST_TIME_LIMIT = 60;

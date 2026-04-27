@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS rooms (
   start_word TEXT NOT NULL,
   target_word TEXT NOT NULL,
   difficulty TEXT DEFAULT 'medium' CHECK (difficulty IN ('easy', 'medium', 'hard')),
+  game_mode TEXT DEFAULT 'speed' CHECK (game_mode IN ('speed', 'shortest')),
   time_limit INT DEFAULT 90,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   started_at TIMESTAMPTZ,

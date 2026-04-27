@@ -5,6 +5,16 @@ import { ApiError, withErrorHandler } from '@/lib/api-error';
 import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 import { debug, monitor } from '@/lib/debug';
 
+interface RoomPlayerRecord {
+  id: string;
+  room_id: string;
+  player_name: string;
+  chain: string[] | null;
+  finished_at: string | null;
+  is_winner: boolean;
+  wants_rematch: boolean;
+}
+
 // POST /api/rooms/submit - Submit a word to the chain
 export const POST = withErrorHandler('rooms/submit', async (request: Request) => {
   checkRateLimit(request as NextRequest, 'rooms/submit', RATE_LIMITS.submit);
@@ -17,16 +27,18 @@ export const POST = withErrorHandler('rooms/submit', async (request: Request) =>
 
   const supabase = createServiceClient();
 
-  // Fetch room and player in parallel
+  // Fetch room, player, and all players in parallel
   const fetchStart = performance.now();
-  const [roomResult, playerResult] = await Promise.all([
+  const [roomResult, playerResult, allPlayersResult] = await Promise.all([
     supabase.from('rooms').select('*').eq('id', roomId).single(),
     supabase.from('room_players').select('*').eq('id', playerId).single(),
+    supabase.from('room_players').select('*').eq('room_id', roomId),
   ]);
   monitor.trackLatency('rooms/submit:fetch', performance.now() - fetchStart);
 
   const { data: room, error: roomError } = roomResult;
   const { data: player, error: playerError } = playerResult;
+  const { data: allPlayers } = allPlayersResult;
 
   if (roomError || !room) {
     throw new ApiError({ code: 'NOT_FOUND', message: 'Room not found' });
@@ -78,12 +90,19 @@ export const POST = withErrorHandler('rooms/submit', async (request: Request) =>
 
   // Add word to chain
   const newChain = [...currentChain, finalWord];
-  const isWinner = finalWord === room.target_word.toLowerCase();
+  const reachedTarget = finalWord === room.target_word.toLowerCase();
+  const isShortestMode = room.game_mode === 'shortest';
 
   const updateData: Record<string, unknown> = { chain: newChain };
-  if (isWinner) {
+
+  // In speed mode, reaching target means immediate win
+  // In shortest mode, reaching target marks player as finished but doesn't end the game
+  if (reachedTarget) {
     updateData.finished_at = new Date().toISOString();
-    updateData.is_winner = true;
+    // Only mark as winner immediately in speed mode
+    if (!isShortestMode) {
+      updateData.is_winner = true;
+    }
   }
 
   const { error: updateError } = await supabase
@@ -100,8 +119,9 @@ export const POST = withErrorHandler('rooms/submit', async (request: Request) =>
     });
   }
 
-  // If winner, update room
-  if (isWinner) {
+  // Handle game end logic based on mode
+  if (reachedTarget && !isShortestMode) {
+    // Speed mode: First to finish wins immediately
     const { error: roomUpdateError } = await supabase
       .from('rooms')
       .update({
@@ -114,11 +134,61 @@ export const POST = withErrorHandler('rooms/submit', async (request: Request) =>
     if (roomUpdateError) {
       debug.api.error('Failed to update room winner:', roomUpdateError);
     }
+  } else if (reachedTarget && isShortestMode) {
+    // Shortest mode: Check if all players have finished
+    // Refresh player data after our update
+    const { data: updatedPlayers } = await supabase
+      .from('room_players')
+      .select('*')
+      .eq('room_id', roomId);
+
+    const typedPlayers = updatedPlayers as RoomPlayerRecord[] | null;
+    const allFinished = typedPlayers?.every((p: RoomPlayerRecord) => p.finished_at !== null);
+
+    if (allFinished && typedPlayers) {
+      // All players finished - determine winner by shortest chain
+      const finishedPlayers = typedPlayers.filter((p: RoomPlayerRecord) => p.finished_at !== null);
+      const sortedByChainLength = finishedPlayers.sort(
+        (a: RoomPlayerRecord, b: RoomPlayerRecord) => (a.chain?.length || Infinity) - (b.chain?.length || Infinity)
+      );
+
+      const shortestLength = sortedByChainLength[0]?.chain?.length;
+      const winners = sortedByChainLength.filter((p: RoomPlayerRecord) => p.chain?.length === shortestLength);
+
+      // If there's a tie, the first to finish among tied players wins
+      const tiebreaker = winners.sort(
+        (a: RoomPlayerRecord, b: RoomPlayerRecord) => new Date(a.finished_at!).getTime() - new Date(b.finished_at!).getTime()
+      );
+      const winnerId = tiebreaker[0]?.id;
+
+      // Mark the winner
+      if (winnerId) {
+        await supabase
+          .from('room_players')
+          .update({ is_winner: true })
+          .eq('id', winnerId);
+      }
+
+      // End the game
+      const { error: roomUpdateError } = await supabase
+        .from('rooms')
+        .update({
+          status: ROOM_STATUS.FINISHED,
+          finished_at: new Date().toISOString(),
+          winner_id: winnerId || null,
+        })
+        .eq('id', roomId);
+
+      if (roomUpdateError) {
+        debug.api.error('Failed to update room for shortest mode:', roomUpdateError);
+      }
+    }
   }
 
   return NextResponse.json({
     success: true,
     chain: newChain,
-    isWinner,
+    reachedTarget,
+    isWinner: reachedTarget && !isShortestMode, // Only immediate winner in speed mode
   });
 });
