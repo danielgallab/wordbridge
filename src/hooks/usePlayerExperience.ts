@@ -9,11 +9,13 @@ export type HintPreference = 'auto' | 'minimal' | 'off';
 interface PlayerExperience {
   gamesCompleted: number;
   hintsPreference: HintPreference;
+  playerName: string;
 }
 
 const DEFAULT_EXPERIENCE: PlayerExperience = {
   gamesCompleted: 0,
   hintsPreference: 'auto',
+  playerName: '',
 };
 
 function loadExperience(): PlayerExperience {
@@ -27,6 +29,7 @@ function loadExperience(): PlayerExperience {
     return {
       gamesCompleted: parsed.gamesCompleted ?? 0,
       hintsPreference: parsed.hintsPreference ?? 'auto',
+      playerName: parsed.playerName ?? '',
     };
   } catch {
     return DEFAULT_EXPERIENCE;
@@ -69,6 +72,14 @@ export function usePlayerExperience() {
     });
   }, []);
 
+  const setPlayerName = useCallback((name: string) => {
+    setExperience(prev => {
+      const updated = { ...prev, playerName: name };
+      saveExperience(updated);
+      return updated;
+    });
+  }, []);
+
   // Determine if player is experienced (completed 3+ games)
   const isExperienced = experience.gamesCompleted >= 3;
 
@@ -79,11 +90,13 @@ export function usePlayerExperience() {
   return {
     gamesCompleted: experience.gamesCompleted,
     hintsPreference: experience.hintsPreference,
+    playerName: experience.playerName,
     isExperienced,
     autoHintsEnabled,
     isLoaded,
     incrementGamesCompleted,
     setHintsPreference,
+    setPlayerName,
   };
 }
 
@@ -95,4 +108,13 @@ export function getPlayerExperience(): PlayerExperience {
 export function recordGameCompletion(): void {
   const current = loadExperience();
   saveExperience({ ...current, gamesCompleted: current.gamesCompleted + 1 });
+}
+
+export function getStoredPlayerName(): string {
+  return loadExperience().playerName;
+}
+
+export function savePlayerName(name: string): void {
+  const current = loadExperience();
+  saveExperience({ ...current, playerName: name });
 }

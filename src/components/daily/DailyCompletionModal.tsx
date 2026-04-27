@@ -6,6 +6,7 @@ import { useDailyStore } from '@/stores/dailyStore';
 import { DailyLeaderboard } from './DailyLeaderboard';
 import { DailyStats } from './DailyStats';
 import { NameInputModal } from './NameInputModal';
+import { savePlayerName } from '@/hooks/usePlayerExperience';
 import type { DailyPuzzle } from '@/types';
 import type { PathQuality } from '@/lib/scoring';
 import type { ShareCompletion } from '@/lib/daily.server';
@@ -55,6 +56,8 @@ export function DailyCompletionModal({
       });
 
       if (response.ok) {
+        // Save name locally for future auto-population
+        savePlayerName(name);
         setShowNameInput(false);
         // Reload leaderboard to show updated name
         await loadLeaderboard();

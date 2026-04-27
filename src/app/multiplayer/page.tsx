@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, HelpCircle, Network, Plus, LogIn } from 'lucide-react';
 import { useGameStore } from '@/stores/gameStore';
 import { Tutorial } from '@/components/Tutorial';
 import { useTutorial } from '@/hooks/useTutorial';
+import { getStoredPlayerName, savePlayerName } from '@/hooks/usePlayerExperience';
 
 function MultiplayerContent() {
   const router = useRouter();
@@ -21,6 +22,14 @@ function MultiplayerContent() {
   );
   const [playerName, setPlayerName] = useState('');
   const [joinCode, setJoinCode] = useState('');
+
+  // Load stored player name on mount
+  useEffect(() => {
+    const storedName = getStoredPlayerName();
+    if (storedName) {
+      setPlayerName(storedName);
+    }
+  }, []);
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
   const [gameMode, setGameMode] = useState<'speed' | 'shortest'>('speed');
   const [isCreating, setIsCreating] = useState(false);
@@ -56,8 +65,11 @@ function MultiplayerContent() {
       setPlayer(data.player.id, data.player.player_name);
       initGame(data.room, data.player.id, [data.player]);
 
-      // Persist playerId for reload recovery
-      try { localStorage.setItem(`wb_player_${data.room.code}`, data.player.id); } catch {}
+      // Persist playerId for reload recovery and save name for future auto-population
+      try {
+        localStorage.setItem(`wb_player_${data.room.code}`, data.player.id);
+        savePlayerName(playerName.trim());
+      } catch {}
 
       // Navigate to game
       router.push(`/play/${data.room.code}`);
@@ -104,8 +116,11 @@ function MultiplayerContent() {
       setPlayer(data.player.id, data.player.player_name);
       initGame(data.room, data.player.id, data.room.room_players || []);
 
-      // Persist playerId for reload recovery
-      try { localStorage.setItem(`wb_player_${data.room.code}`, data.player.id); } catch {}
+      // Persist playerId for reload recovery and save name for future auto-population
+      try {
+        localStorage.setItem(`wb_player_${data.room.code}`, data.player.id);
+        savePlayerName(playerName.trim());
+      } catch {}
 
       // Navigate to game
       router.push(`/play/${data.room.code}`);

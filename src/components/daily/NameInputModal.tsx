@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { User, X } from 'lucide-react';
+import { getStoredPlayerName } from '@/hooks/usePlayerExperience';
 
 interface NameInputModalProps {
   onSubmit: (name: string) => void;
@@ -11,6 +12,13 @@ interface NameInputModalProps {
 
 export function NameInputModal({ onSubmit, onSkip, isSubmitting }: NameInputModalProps) {
   const [name, setName] = useState('');
+
+  useEffect(() => {
+    const storedName = getStoredPlayerName();
+    if (storedName) {
+      setName(storedName);
+    }
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
